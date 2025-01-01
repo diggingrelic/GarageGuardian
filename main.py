@@ -11,16 +11,20 @@ print("="*40 + "\n")
 # Run tests first if debug is enabled
 if LogConfig.DEBUG:
     try:
-        from gg.tests.run_tests import run_tests
-        passed, failed = run_tests()
+        import gg.testing
+        passed, failed = gg.testing.run_tests()
         if failed > 0:
             print("\nWARNING: Some tests failed!")
-            time.sleep(2)  # Give time to see failures
+            time.sleep(2)
+    except ImportError as e:
+        print(f"Test import error: {str(e)}")
+        print("Path:", gg.testing.__file__ if hasattr(gg.testing, '__file__') else "Unknown")
     except Exception as e:
         print(f"Test error: {e}")
-        time.sleep(2)  # Give time to see error
+        time.sleep(2)
 
 # Continue with normal startup
+print("\nStarting GarageOS...")
 try:
     from gg.IoTController import IoTController
 except Exception as e:
