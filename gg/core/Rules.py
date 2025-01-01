@@ -1,173 +1,175 @@
-from enum import Enum
+from micropython import const
 import time
 import asyncio
-from typing import Callable, Dict, List
 
-class SafetySeverity(Enum):
-    CRITICAL = 0    # Immediate shutdown required
-    HIGH = 1        # Requires immediate action
-    MEDIUM = 2      # Requires attention
-    LOW = 3         # Advisory only
+# Rule constants
+MAX_RULES = const(20)
+EVAL_RETRY = const(3)
+RULE_TIMEOUT = const(1000)
 
-class SafetyStatus(Enum):
-    NORMAL = "normal"
-    WARNING = "warning"
-    VIOLATION = "violation"
-    FAILURE = "failure"
+class RulePriority:
+    CRITICAL = const(0)
+    HIGH = const(1)
+    NORMAL = const(2)
+    LOW = const(3)
 
-class SafetyCondition:
-    def __init__(self, 
-                 name: str,
-                 check_func: Callable,
-                 severity: SafetySeverity,
-                 threshold: int = 1):  # Number of violations before triggering
+class RuleStatus:
+    ACTIVE = "active"
+    DISABLED = "disabled"
+    TRIGGERED = "triggered"
+    FAILED = "failed"
+    COOLDOWN = "cooldown"
+
+class Rule:
+    def __init__(self, name, condition, action, priority=RulePriority.NORMAL, cooldown=0):
         self.name = name
-        self.check = check_func
-        self.severity = severity
-        self.threshold = threshold
-        self.status = SafetyStatus.NORMAL
-        self.violation_count = 0
-        self.last_check = 0
-        self.last_violation = None
-        self.recovery_action = None
+        self.condition = condition
+        self.action = action
+        self.priority = priority
+        self.cooldown = cooldown
+        self.status = RuleStatus.ACTIVE
+        self.last_triggered = 0
+        self.trigger_count = 0
+        self.last_error = None
+        self.retry_count = 0
 
-class SafetyMonitor:
+    def can_trigger(self):
+        """Check if rule can trigger based on cooldown"""
+        if self.status == RuleStatus.DISABLED:
+            return False
+        return (time.time() - self.last_triggered) > self.cooldown
+
+class RulesEngine:
     def __init__(self, event_system=None):
-        self.conditions: Dict[str, SafetyCondition] = {}
+        self.rules = []
         self.event_system = event_system
         self.active = True
-        self.last_check = 0
-        self.check_interval = 1  # seconds
-        self.violation_history = []
-        self.max_history = 100
-        
-    def add_condition(self, 
-                     name: str, 
-                     check_func: Callable,
-                     severity: SafetySeverity,
-                     threshold: int = 1,
-                     recovery_action: Callable = None):
-        """Add a safety condition to monitor"""
-        condition = SafetyCondition(name, check_func, severity, threshold)
-        condition.recovery_action = recovery_action
-        self.conditions[name] = condition
+        self.last_evaluation = None
+        self.eval_lock = False
 
-    async def check_safety(self) -> bool:
-        """Check all safety conditions"""
-        if not self.active:
-            return True
+    def add_rule(self, name, condition, action, priority=RulePriority.NORMAL, cooldown=0):
+        """Add a new rule to the engine"""
+        if len(self.rules) >= MAX_RULES:
+            raise Exception("Maximum rules limit reached")
+            
+        rule = Rule(name, condition, action, priority, cooldown)
+        self.rules.append(rule)
+        # Sort rules by priority
+        self.rules.sort(key=lambda x: x.priority)
+        return rule
 
-        current_time = time.time()
-        if current_time - self.last_check < self.check_interval:
-            return True
+    def remove_rule(self, name):
+        """Remove a rule by name"""
+        initial_length = len(self.rules)
+        self.rules = [r for r in self.rules if r.name != name]
+        return len(self.rules) < initial_length
 
-        self.last_check = current_time
-        all_safe = True
-        violations = []
+    def disable_rule(self, name):
+        """Disable a rule temporarily"""
+        for rule in self.rules:
+            if rule.name == name:
+                rule.status = RuleStatus.DISABLED
+                return True
+        return False
 
-        for condition in self.conditions.values():
-            try:
-                is_safe = await self._check_condition(condition)
-                if not is_safe:
-                    all_safe = False
-                    violations.append(condition)
-                    
-            except Exception as e:
-                print(f"Safety check error ({condition.name}): {e}")
-                condition.status = SafetyStatus.FAILURE
-                all_safe = False
+    def enable_rule(self, name):
+        """Re-enable a disabled rule"""
+        for rule in self.rules:
+            if rule.name == name:
+                rule.status = RuleStatus.ACTIVE
+                rule.retry_count = 0
+                return True
+        return False
 
-        if violations:
-            await self._handle_violations(violations)
+    async def evaluate_rules(self):
+        """Evaluate all active rules"""
+        if not self.active or self.eval_lock:
+            return
 
-        return all_safe
-
-    async def _check_condition(self, condition: SafetyCondition) -> bool:
-        """Check a single safety condition"""
         try:
-            if asyncio.iscoroutinefunction(condition.check):
-                is_safe = await condition.check()
-            else:
-                is_safe = condition.check()
+            self.eval_lock = True
+            self.last_evaluation = time.time()
+            
+            for rule in self.rules:
+                if not rule.can_trigger():
+                    continue
 
-            condition.last_check = time.time()
-
-            if not is_safe:
-                condition.violation_count += 1
-                if condition.violation_count >= condition.threshold:
-                    condition.status = SafetyStatus.VIOLATION
-                    condition.last_violation = time.time()
-                    return False
-                else:
-                    condition.status = SafetyStatus.WARNING
-            else:
-                condition.status = SafetyStatus.NORMAL
-                condition.violation_count = 0
-
-            return True
-
-        except Exception as e:
-            condition.status = SafetyStatus.FAILURE
-            raise Exception(f"Condition check error: {e}")
-
-    async def _handle_violations(self, violations: List[SafetyCondition]):
-        """Handle safety violations"""
-        for condition in violations:
-            # Log violation
-            violation_record = {
-                'name': condition.name,
-                'severity': condition.severity.value,
-                'timestamp': time.time(),
-                'violation_count': condition.violation_count
-            }
-            self.violation_history.append(violation_record)
-            if len(self.violation_history) > self.max_history:
-                self.violation_history.pop(0)
-
-            # Attempt recovery if action exists
-            if condition.recovery_action:
                 try:
-                    if asyncio.iscoroutinefunction(condition.recovery_action):
-                        await condition.recovery_action()
-                    else:
-                        condition.recovery_action()
+                    if await self._evaluate_condition(rule):
+                        await self._execute_action(rule)
                 except Exception as e:
-                    print(f"Recovery action error ({condition.name}): {e}")
+                    await self._handle_rule_error(rule, str(e))
 
-            # Publish event
+        finally:
+            self.eval_lock = False
+
+    async def _evaluate_condition(self, rule):
+        """Evaluate a rule's condition"""
+        try:
+            if hasattr(rule.condition, '__await__'):
+                result = await rule.condition()
+            else:
+                result = rule.condition()
+            
+            rule.retry_count = 0
+            return bool(result)
+            
+        except Exception as e:
+            print("Condition error:", e)
+            return False
+
+    async def _execute_action(self, rule):
+        """Execute a rule's action"""
+        try:
+            if hasattr(rule.action, '__await__'):
+                await rule.action()
+            else:
+                rule.action()
+            
+            rule.last_triggered = time.time()
+            rule.trigger_count += 1
+            rule.status = RuleStatus.TRIGGERED
+
             if self.event_system:
-                await self.event_system.publish(
-                    'safety_violation',
-                    {
-                        'condition': condition.name,
-                        'severity': condition.severity.value,
-                        'status': condition.status.value,
-                        'count': condition.violation_count
-                    }
-                )
+                await self.event_system.publish('rule_triggered', {
+                    'rule': rule.name,
+                    'count': rule.trigger_count,
+                    'priority': rule.priority
+                })
+                
+        except Exception as e:
+            raise Exception(f"Action error: {e}")
 
-    def get_status(self):
-        """Get current safety status"""
+    async def _handle_rule_error(self, rule, error):
+        """Handle rule execution error"""
+        rule.last_error = error
+        rule.retry_count += 1
+        
+        if rule.retry_count >= EVAL_RETRY:
+            rule.status = RuleStatus.FAILED
+            if self.event_system:
+                await self.event_system.publish('rule_error', {
+                    'rule': rule.name,
+                    'error': error
+                })
+
+    def get_rule_status(self, name=None):
+        """Get status of one or all rules"""
+        if name:
+            for rule in self.rules:
+                if rule.name == name:
+                    return self._get_rule_state(rule)
+            return None
+        
+        return [self._get_rule_state(rule) for rule in self.rules]
+
+    def _get_rule_state(self, rule):
+        """Get state of a single rule"""
         return {
-            'active': self.active,
-            'last_check': self.last_check,
-            'conditions': {
-                name: {
-                    'status': cond.status.value,
-                    'severity': cond.severity.value,
-                    'violations': cond.violation_count,
-                    'last_check': cond.last_check,
-                    'last_violation': cond.last_violation
-                }
-                for name, cond in self.conditions.items()
-            },
-            'critical_conditions': [
-                cond.name for cond in self.conditions.values()
-                if cond.severity == SafetySeverity.CRITICAL and 
-                cond.status == SafetyStatus.VIOLATION
-            ]
+            'name': rule.name,
+            'status': rule.status,
+            'priority': rule.priority,
+            'triggers': rule.trigger_count,
+            'last_triggered': rule.last_triggered,
+            'last_error': rule.last_error
         }
-
-    def get_violations(self, limit=10):
-        """Get recent violations"""
-        return self.violation_history[-limit:]

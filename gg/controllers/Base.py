@@ -1,11 +1,11 @@
 import time
-import asyncio
-from micropython import const
+#import asyncio
+#from micropython import const
 
 # Base controller constants
-WATCHDOG_TIMEOUT = const(30)  # seconds
-MAX_ERROR_COUNT = const(5)    # max errors before disable
-ERROR_RESET_TIME = const(3600)  # 1 hour to reset error count
+WATCHDOG_TIMEOUT = 30 #const(30)  # seconds
+MAX_ERROR_COUNT = 5 #const(5)    # max errors before disable
+ERROR_RESET_TIME = 3600 #const(3600)  # 1 hour to reset error count
 
 class ControllerState:
     INITIALIZING = "initializing"

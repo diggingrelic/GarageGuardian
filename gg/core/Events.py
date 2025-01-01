@@ -1,97 +1,80 @@
-import asyncio
-from collections import defaultdict, deque
+from micropython import const # type: ignore
+from collections import deque
 import time
+import asyncio
+
+# Event system constants
+MAX_SUBSCRIBERS = const(20)  # Per event type
+MAX_HISTORY = const(50)     # Maximum events to keep in history
 
 class Event:
-    def __init__(self, event_type, data=None, timestamp=None):
+    def __init__(self, event_type, data=None):
         self.type = event_type
         self.data = data
-        self.timestamp = timestamp or time.time()
+        self.timestamp = time.time()
         self.handled = False
 
 class EventSystem:
     def __init__(self):
-        # Separate sync and async handlers
-        self.sync_subscribers = defaultdict(list)
-        self.async_subscribers = defaultdict(list)
-        
-        # Event history with limited size
-        self.history = deque(maxlen=1000)
-        
-        # Event statistics
+        self.subscribers = {}      # Dictionary of event subscribers
+        self.history = deque((), 10)
         self.stats = {
-            'events_processed': 0,
-            'events_dropped': 0,
-            'handler_errors': 0
+            'processed': 0,
+            'dropped': 0,
+            'errors': 0
         }
-        
-        # Priority handlers get called first
-        self.priority_handlers = defaultdict(list)
-        
-    def subscribe(self, event_type, handler, priority=False, is_async=False):
-        """Subscribe to an event type"""
-        if is_async:
-            if handler not in self.async_subscribers[event_type]:
-                self.async_subscribers[event_type].append(handler)
-        else:
-            if handler not in self.sync_subscribers[event_type]:
-                self.sync_subscribers[event_type].append(handler)
-                
-        if priority:
-            self.priority_handlers[event_type].append(handler)
+
+    def subscribe(self, event_type, handler):
+        """Add an event handler"""
+        if event_type not in self.subscribers:
+            self.subscribers[event_type] = []
             
+        if len(self.subscribers[event_type]) < MAX_SUBSCRIBERS:
+            if handler not in self.subscribers[event_type]:
+                self.subscribers[event_type].append(handler)
+                return True
+        return False
+
     def unsubscribe(self, event_type, handler):
-        """Remove a handler subscription"""
-        self.sync_subscribers[event_type] = [
-            h for h in self.sync_subscribers[event_type] if h != handler
-        ]
-        self.async_subscribers[event_type] = [
-            h for h in self.async_subscribers[event_type] if h != handler
-        ]
-        self.priority_handlers[event_type] = [
-            h for h in self.priority_handlers[event_type] if h != handler
-        ]
-            
+        """Remove an event handler"""
+        if event_type in self.subscribers:
+            if handler in self.subscribers[event_type]:
+                self.subscribers[event_type].remove(handler)
+                return True
+        return False
+
     async def publish(self, event_type, data=None):
-        """Publish an event"""
-        event = Event(event_type, data)
-        self.history.append(event)
-        
+        """Publish an event to all subscribers"""
         try:
-            # Handle priority handlers first
-            for handler in self.priority_handlers[event_type]:
-                try:
-                    if asyncio.iscoroutinefunction(handler):
-                        await handler(event)
-                    else:
-                        handler(event)
-                except Exception as e:
-                    print(f"Priority handler error: {e}")
-                    self.stats['handler_errors'] += 1
+            event = Event(event_type, data)
+            self.history.append(event)
             
-            # Handle regular async handlers
-            async_tasks = [
-                handler(event)
-                for handler in self.async_subscribers[event_type]
-            ]
-            if async_tasks:
-                await asyncio.gather(*async_tasks, return_exceptions=True)
-            
-            # Handle synchronous handlers
-            for handler in self.sync_subscribers[event_type]:
-                try:
-                    handler(event)
-                except Exception as e:
-                    print(f"Sync handler error: {e}")
-                    self.stats['handler_errors'] += 1
-            
-            self.stats['events_processed'] += 1
-            event.handled = True
-            
+            if event_type in self.subscribers:
+                tasks = []
+                for handler in self.subscribers[event_type]:
+                    try:
+                        # Simpler async check and execution
+                        if hasattr(handler, '__call__'):  # Check if callable
+                            if hasattr(handler, 'is_coroutine') or hasattr(handler, '_is_coroutine'):
+                                tasks.append(handler(event))
+                            else:
+                                handler(event)
+                    except Exception as e:
+                        print(f"Handler error: {e}")
+                        
+                if tasks:
+                    for task in tasks:
+                        await task
+                    
+                event.handled = True
+                self.stats['processed'] += 1
+            else:
+                self.stats['dropped'] += 1
+                
         except Exception as e:
-            print(f"Event publishing error: {e}")
-            self.stats['events_dropped'] += 1
-            
+            print(f"Event publish error: {e}")
+            self.stats['errors'] += 1
+
     def get_recent_events(self, event_type=None, limit=10):
         """Get recent events, optionally filtered by type"""
         if event_type:
@@ -99,33 +82,20 @@ class EventSystem:
         else:
             events = list(self.history)
         return events[-limit:]
-    
+
     def get_stats(self):
         """Get event system statistics"""
-        return {
-            **self.stats,
-            'subscribers': {
-                'sync': {k: len(v) for k, v in self.sync_subscribers.items()},
-                'async': {k: len(v) for k, v in self.async_subscribers.items()},
-                'priority': {k: len(v) for k, v in self.priority_handlers.items()}
-            }
+        stats = {
+            'processed': self.stats['processed'],
+            'dropped': self.stats['dropped'],
+            'errors': self.stats['errors'],
+            'subscribers': {}
         }
-        
+        # Add subscriber counts
+        for k, v in self.subscribers.items():
+            stats['subscribers'][k] = len(v)
+        return stats
+
     def clear_history(self):
         """Clear event history"""
         self.history.clear()
-        
-    async def wait_for_event(self, event_type, timeout=None):
-        """Wait for a specific event to occur"""
-        future = asyncio.get_event_loop().create_future()
-        
-        def handler(event):
-            if not future.done():
-                future.set_result(event)
-                
-        self.subscribe(event_type, handler)
-        
-        try:
-            return await asyncio.wait_for(future, timeout)
-        finally:
-            self.unsubscribe(event_type, handler)

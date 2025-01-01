@@ -1,47 +1,34 @@
+# main.py - Production version with automatic recovery
+import machine # type: ignore
 import time
 import asyncio
-from config import LogConfig
 
-# Development mode identifier and safety delay
-print("\n" + "="*40)
-print("DEVELOPMENT MODE")
-print("Starting tests...")
-print("="*40 + "\n")
+# No delay in production
+print("PRODUCTION MODE")
 
-# Run tests first if debug is enabled
-if LogConfig.DEBUG:
-    try:
-        from gg.tests.run_tests import run_tests
-        passed, failed = run_tests()
-        if failed > 0:
-            print("\nWARNING: Some tests failed!")
-            time.sleep(2)  # Give time to see failures
-    except Exception as e:
-        print(f"Test error: {e}")
-        time.sleep(2)  # Give time to see error
-
-# Continue with normal startup
+# Import our GarageOS system
 try:
     from gg.IoTController import IoTController
 except Exception as e:
     print(f"Import error: {e}")
-    raise
+    machine.reset()  # In production, reset on import failure
 
 class GarageOS:
     def __init__(self):
         self.name = "GarageOS"
         self.version = "1.0.0"
+        self.watchdog = machine.WDT(timeout=8000)  # 8 second watchdog
         try:
             self.controller = IoTController()
         except Exception as e:
             print(f"Controller init error: {e}")
-            raise
+            machine.reset()
         self.running = True
 
     async def startup(self):
         """Initialize and start the system"""
         print(f"Starting {self.name} v{self.version}")
-        print("Initializing system components...")
+        self.watchdog.feed()
         
         try:
             if await self.controller.initialize():
@@ -60,14 +47,12 @@ class GarageOS:
         print("Entering main run loop...")
         try:
             while self.running:
+                self.watchdog.feed()  # Feed watchdog in main loop
                 await self.controller.run()
                 await asyncio.sleep_ms(100)
                 
         except Exception as e:
             print(f"System error: {e}")
-            await self.safe_shutdown()
-        except KeyboardInterrupt:
-            print("\nClean shutdown requested")
             await self.safe_shutdown()
 
     async def safe_shutdown(self):
@@ -78,6 +63,8 @@ class GarageOS:
             await self.controller.safe_shutdown()
         except Exception as e:
             print(f"Shutdown error: {e}")
+        finally:
+            machine.reset()  # Always reset in production
 
 # Main execution
 async def main():
@@ -93,18 +80,14 @@ async def main():
             await system.safe_shutdown()
     except Exception as e:
         print(f"Main error: {e}")
+        machine.reset()
 
 # Handle startup and errors
-try:
-    print("Starting main asyncio loop")
-    asyncio.run(main())
-except KeyboardInterrupt:
-    print("\nSystem shutdown requested")
-except Exception as e:
-    print(f"Fatal error: {e}")
-finally:
-    # Development-friendly shutdown
-    print("\n" + "="*40)
-    print("System stopped. Use Thonny's Stop/Restart")
-    print("to return to development mode.")
-    print("="*40 + "\n")
+while True:  # Production infinite retry loop
+    try:
+        print("Starting main asyncio loop")
+        asyncio.run(main())
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        time.sleep(5)  # Wait before retry
+        machine.reset()

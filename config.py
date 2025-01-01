@@ -13,11 +13,20 @@ class PinConfig:
     POWER_OUTLETS = [19, 20, 21, 22]
     
     # Communication
-    UART_TX = 0
-    UART_RX = 1
+    UART_TX = 6
+    UART_RX = 7
     
     # LED Status
-    STATUS_LED = 25
+    STATUS_LED = "LED"
+
+    # I2C
+    I2C_SDA = 4
+    I2C_SCL = 5
+
+class LogConfig:
+    DEBUG = True
+    RUN_TESTS = True
+    TEST_DELAY = 2  # Seconds to wait after test failures
 
 class SystemConfig:
     # Thermostat settings

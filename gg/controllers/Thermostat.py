@@ -1,7 +1,7 @@
-from .base import BaseController
+from .Base import BaseController
 import time
-from micropython import const
-
+from micropython import const #type: ignore
+from config import SystemConfig
 # Thermostat constants
 MIN_CYCLE_TIME = const(300)  # 5 minutes minimum run time
 MAX_CYCLE_TIME = const(1800)  # 30 minutes maximum run time
@@ -128,7 +128,7 @@ class ThermostatController(BaseController):
             
     async def set_temperature(self, temp):
         """Set target temperature"""
-        if MIN_TEMP <= temp <= MAX_TEMP:
+        if SystemConfig.MIN_TEMP <= temp <= SystemConfig.MAX_TEMP:
             self.target_temp = temp
             if self.event_system:
                 await self.event_system.publish(

@@ -1,12 +1,13 @@
-from machine import ADC, I2C
+from machine import ADC, I2C, Pin
 from time import time
 from collections import deque
+from config import PinConfig
 
 class SensorManager:
     def __init__(self, i2c=None):
         self.sensors = {}
         self.history = {}
-        self.i2c = i2c or I2C(0, freq=400000)
+        self.i2c = i2c or I2C(0, sda=Pin(PinConfig.I2C_SDA), scl=Pin(PinConfig.I2C_SCL), freq=400000)
         
     def add_sensor(self, name, sensor_type, pin=None, address=None):
         """Add a new sensor"""
