@@ -6,8 +6,8 @@ def run_tests():
     print("=" * 40)
     
     # Import test modules
-    from tests.test_events import TestEvents
-    from tests.test_iot_controller import TestIoTController
+    from testing.test_events import TestEvents
+    from testing.test_iot_controller import TestIoTController
     
     # Create test instances
     event_tests = TestEvents()
