@@ -1,18 +1,17 @@
-import unittest
-import asyncio
-from gg.IoTController import IoTController
+from .microtest import TestCase
+from ..IoTController import IoTController
 from .mocks import MockPin
 
-class TestIoTController(unittest.TestCase):
-    def setUp(self):
-        # Use our mock pin instead of real hardware
+class TestIoTController(TestCase):
+    def __init__(self):
+        super().__init__()
         self.controller = IoTController()
         self.controller.led = MockPin("LED", MockPin.OUT)
 
     def test_init(self):
         """Test controller initialization"""
         self.assertEqual(self.controller.state, "initializing")
-        self.assertIsNotNone(self.controller.events)
+        self.assertTrue(hasattr(self.controller, 'events'))
 
     async def test_initialize(self):
         """Test async initialization"""
@@ -26,12 +25,8 @@ class TestIoTController(unittest.TestCase):
         await self.controller.initialize()
         
         # Start run loop but only for a short time
-        run_task = asyncio.create_task(self.controller.run())
-        await asyncio.sleep(2)  # Let it run for 2 seconds
+        self.controller.state = "running"
+        await self.controller.run()
         
         # Check that LED state changed
-        self.assertNotEqual(initial_state, self.controller.led.value())
-        
-        # Cleanup
-        self.controller.state = "shutdown"
-        await run_task 
+        self.assertNotEqual(initial_state, self.controller.led.value()) 

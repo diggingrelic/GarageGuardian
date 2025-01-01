@@ -11,14 +11,14 @@ print("="*40 + "\n")
 # Run tests first if debug is enabled
 if LogConfig.DEBUG:
     try:
-        import gg.testing
-        passed, failed = gg.testing.run_tests()
+        # Direct import of run_tests
+        from gg.testing.run_tests import run_tests
+        passed, failed = run_tests()
         if failed > 0:
             print("\nWARNING: Some tests failed!")
             time.sleep(2)
     except ImportError as e:
         print(f"Test import error: {str(e)}")
-        print("Path:", gg.testing.__file__ if hasattr(gg.testing, '__file__') else "Unknown")
     except Exception as e:
         print(f"Test error: {e}")
         time.sleep(2)
