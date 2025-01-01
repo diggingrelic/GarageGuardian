@@ -1,8 +1,9 @@
-import unittest
-from gg.core.Events import EventSystem
+from .microtest import TestCase
+from ..core.Events import EventSystem
 
-class TestEvents(unittest.TestCase):
-    def setUp(self):
+class TestEvents(TestCase):
+    def __init__(self):
+        super().__init__()
         self.events = EventSystem()
         self.test_data = []
 
