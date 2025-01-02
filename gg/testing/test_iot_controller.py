@@ -1,6 +1,7 @@
 from .microtest import TestCase
 from ..IoTController import IoTController
 from .mocks import MockPin
+from collections import deque
 
 class TestIoTController(TestCase):
     def __init__(self):
@@ -45,6 +46,6 @@ class TestIoTController(TestCase):
         self.controller.state = "error"
         self.assertEqual(self.controller.state, "error")
         
-        # Clean up
-        self.controller.error_log.clear()
+        # Clean up - create new empty deque instead of clearing
+        self.controller.error_log = deque((), 10)  # Same size as in IoTController
         self.controller.state = "initializing"  # Reset state 
