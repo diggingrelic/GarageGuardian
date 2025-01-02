@@ -1,7 +1,7 @@
 from .microtest import TestCase
 from ..IoTController import IoTController
 from .mocks import MockPin
-from collections import deque
+import gc
 
 class TestIoTController(TestCase):
     def __init__(self):
@@ -34,18 +34,22 @@ class TestIoTController(TestCase):
 
     async def test_error_handling(self):
         """Test error handling and logging"""
+        # Create a new controller instance for this test
+        test_controller = IoTController()
+        
         # Test error logging
         error_msg = "Test error"
-        self.controller._log_error(error_msg)
+        test_controller._log_error(error_msg)
         
         # Check error log
-        self.assertTrue(len(self.controller.error_log) > 0)
-        self.assertEqual(self.controller.error_log[0]["message"], error_msg)
+        self.assertTrue(len(test_controller.error_log) > 0)
+        self.assertEqual(test_controller.error_log[0]["message"], error_msg)
         
         # Test error state transition
-        self.controller.state = "error"
-        self.assertEqual(self.controller.state, "error")
+        test_controller.state = "error"
+        self.assertEqual(test_controller.state, "error")
         
-        # Clean up - create new empty deque instead of clearing
-        self.controller.error_log = deque((), 10)  # Same size as in IoTController
-        self.controller.state = "initializing"  # Reset state 
+        # Explicit cleanup
+        test_controller.events = None  # Break circular references
+        test_controller = None  # Remove reference
+        gc.collect()  # Force garbage collection 
