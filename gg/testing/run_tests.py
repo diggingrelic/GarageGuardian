@@ -15,23 +15,52 @@ def run_tests():
     print("\nRunning Event Tests:")
     event_tests = TestEvents()
     
-    try:
-        print("  test_subscribe...", end=" ")
-        event_tests.test_subscribe()
-        print("✓")
-        passed += 1
-    except Exception as e:
-        print(f"✗ ({str(e)})")
-        failed += 1
+    test_methods = [
+        ('test_subscribe', False),
+        ('test_subscribe_limit', False),
+        ('test_publish', True),
+        ('test_multiple_subscribers', True),
+        ('test_get_stats', False),
+        ('test_state_transitions', True)
+    ]
     
-    try:
-        print("  test_publish...", end=" ")
-        asyncio.run(event_tests.test_publish())
-        print("✓")
-        passed += 1
-    except Exception as e:
-        print(f"✗ ({str(e)})")
-        failed += 1
+    for method_name, is_async in test_methods:
+        try:
+            print(f"  {method_name}...", end=" ")
+            method = getattr(event_tests, method_name)
+            if is_async:
+                asyncio.run(method())
+            else:
+                method()
+            print("✓")
+            passed += 1
+        except Exception as e:
+            print(f"✗ ({str(e)})")
+            failed += 1
+    
+    # Run IoTController Tests
+    print("\nRunning IoTController Tests:")
+    iot_tests = TestIoTController()
+    
+    iot_test_methods = [
+        ('test_init', False),
+        ('test_initialize', True),
+        ('test_error_handling', True)
+    ]
+    
+    for method_name, is_async in iot_test_methods:
+        try:
+            print(f"  {method_name}...", end=" ")
+            method = getattr(iot_tests, method_name)
+            if is_async:
+                asyncio.run(method())
+            else:
+                method()
+            print("✓")
+            passed += 1
+        except Exception as e:
+            print(f"✗ ({str(e)})")
+            failed += 1
     
     # Clean up
     gc.collect()
