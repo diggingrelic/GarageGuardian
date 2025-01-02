@@ -54,7 +54,7 @@ def run_tests():
             method = getattr(iot_tests, method_name)
             if is_async:
                 asyncio.run(method())
-                print(f"\n  {method_name}... ", end="")  # Reprint test name
+                print(f"  {method_name}... ", end="")  # Reprint test name
             else:
                 method()
             print("✓")
