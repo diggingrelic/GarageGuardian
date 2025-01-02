@@ -54,13 +54,12 @@ def run_tests():
             method = getattr(iot_tests, method_name)
             if is_async:
                 asyncio.run(method())
-                print(f"  {method_name}... ", end="")  # Reprint test name
             else:
                 method()
-            print("✓")
+            print("Passed ✓")
             passed += 1
         except Exception as e:
-            print(f"✗ ({str(e)})")
+            print(f"Failed✗ ({str(e)})")
             failed += 1
     
     # Clean up

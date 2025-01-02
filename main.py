@@ -1,6 +1,7 @@
 import time
 import asyncio
 from config import LogConfig
+from gg.logging.Log import log
 
 # Development mode identifier
 print("=" * 40)
@@ -21,11 +22,11 @@ if LogConfig.RUN_TESTS:
     print("=" * 40)
 
 # Start normal operation
-print("\nStarting GarageOS...")
+log("\nStarting GarageOS...")
 try:
     from gg.IoTController import IoTController
 except Exception as e:
-    print(f"Import error: {e}")
+    log(f"Import error: {e}")
     raise
 
 class GarageOS:
@@ -35,77 +36,77 @@ class GarageOS:
         try:
             self.controller = IoTController()
         except Exception as e:
-            print(f"Controller init error: {e}")
+            log(f"Controller init error: {e}")
             raise
         self.running = True
 
     async def startup(self):
         """Initialize and start the system"""
-        print(f"Starting {self.name} v{self.version}")
-        print("Initializing system components...")
+        log(f"Starting {self.name} v{self.version}")
+        log("Initializing system components...")
         
         try:
             if await self.controller.initialize():
-                print("System initialization successful")
+                log("System initialization successful")
                 return True
             else:
-                print("System initialization failed")
+                log("System initialization failed")
                 return False
                 
         except Exception as e:
-            print(f"Startup error: {e}")
+            log(f"Startup error: {e}")
             return False
 
     async def run(self):
         """Main system run loop"""
-        print("Entering main run loop...")
+        log("Entering main run loop...")
         try:
             while self.running:
                 await self.controller.run()
                 await asyncio.sleep_ms(100)
                 
         except Exception as e:
-            print(f"System error: {e}")
+            log(f"System error: {e}")
             await self.safe_shutdown()
         except KeyboardInterrupt:
-            print("\nClean shutdown requested")
+            log("\nClean shutdown requested")
             await self.safe_shutdown()
 
     async def safe_shutdown(self):
         """Perform safe system shutdown"""
-        print("Performing safe shutdown...")
+        log("Performing safe shutdown...")
         self.running = False
         try:
             await self.controller.safe_shutdown()
         except Exception as e:
-            print(f"Shutdown error: {e}")
+            log(f"Shutdown error: {e}")
 
 # Main execution
 async def main():
-    print("Initializing GarageOS...")
+    log("Initializing GarageOS...")
     try:
         system = GarageOS()
         
         if await system.startup():
-            print("System ready, starting main loop")
+            log("System ready, starting main loop")
             await system.run()
         else:
-            print("System startup failed")
+            log("System startup failed")
             await system.safe_shutdown()
     except Exception as e:
-        print(f"Main error: {e}")
+        log(f"Main error: {e}")
 
 # Handle startup and errors
 try:
-    print("Starting main asyncio loop")
+    log("Starting main asyncio loop")
     asyncio.run(main())
 except KeyboardInterrupt:
-    print("\nSystem shutdown requested")
+    log("\nSystem shutdown requested")
 except Exception as e:
-    print(f"Fatal error: {e}")
+    log(f"Fatal error: {e}")
 finally:
     # Development-friendly shutdown
-    print("\n" + "="*40)
-    print("System stopped. Use Thonny's Stop/Restart")
-    print("to return to development mode.")
-    print("="*40 + "\n")
+    log("\n" + "="*40)
+    log("System stopped. Use Thonny's Stop/Restart")
+    log("to return to development mode.")
+    log("="*40 + "\n")
