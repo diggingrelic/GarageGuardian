@@ -10,8 +10,6 @@ print("=" * 40)
 # Run tests if enabled
 if LogConfig.RUN_TESTS:
     try:
-        print("\nRunning tests...")
-        print("=" * 40)
         from gg.testing.run_tests import run_tests
         passed, failed = run_tests()
         if failed > 0:
