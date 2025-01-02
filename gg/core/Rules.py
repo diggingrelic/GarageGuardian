@@ -1,7 +1,6 @@
-from micropython import const
+from micropython import const # type: ignore
 import time
 import asyncio
-from collections import deque
 
 # Rule constants
 MAX_RULES = const(20)
@@ -164,3 +163,4 @@ class RulesEngine:
                 self.stats['triggered'] += 1
         except Exception as e:
             self.stats['errors'] += 1
+            self.last_error = str(e)
