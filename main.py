@@ -2,28 +2,27 @@ import time
 import asyncio
 from config import LogConfig
 
-# Development mode identifier and safety delay
-print("\n" + "="*40)
+# Development mode identifier
+print("=" * 40)
 print("DEVELOPMENT MODE")
-print("Starting tests...")
-print("="*40 + "\n")
+print("=" * 40)
 
-# Run tests first if debug is enabled
-if LogConfig.DEBUG:
+# Run tests if enabled
+if LogConfig.RUN_TESTS:
     try:
-        # Direct import of run_tests
+        print("\nRunning tests...")
+        print("=" * 40)
         from gg.testing.run_tests import run_tests
         passed, failed = run_tests()
         if failed > 0:
-            print("\nWARNING: Some tests failed!")
-            time.sleep(2)
-    except ImportError as e:
-        print(f"Test import error: {str(e)}")
+            print("WARNING: Some tests failed!")
+            time.sleep(LogConfig.TEST_DELAY)
     except Exception as e:
         print(f"Test error: {e}")
-        time.sleep(2)
+        time.sleep(LogConfig.TEST_DELAY)
+    print("=" * 40)
 
-# Continue with normal startup
+# Start normal operation
 print("\nStarting GarageOS...")
 try:
     from gg.IoTController import IoTController

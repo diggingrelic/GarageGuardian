@@ -24,7 +24,7 @@ class PinConfig:
     I2C_SCL = 5
 
 class LogConfig:
-    DEBUG = True
+    DEBUG = True  # Set to False in production
     RUN_TESTS = True
     TEST_DELAY = 2  # Seconds to wait after test failures
 
