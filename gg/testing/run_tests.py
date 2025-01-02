@@ -1,12 +1,21 @@
 import gc
 import asyncio
 
+def is_test_method(name, obj):
+    """Check if a method is a test method"""
+    return name.startswith('test_') and callable(obj)
+
+def is_async_method(obj):
+    """Check if a method is async"""
+    return hasattr(obj, '__await__') or hasattr(obj, '_is_coroutine')
+
 def run_tests():
     print("\nRunning tests...")
     print("=" * 40)
     
     from .test_events import TestEvents
     from .test_iot_controller import TestIoTController
+    from .test_rules import TestRules
     
     passed = 0
     failed = 0
@@ -15,52 +24,63 @@ def run_tests():
     print("\nRunning Event Tests:")
     event_tests = TestEvents()
     
-    test_methods = [
-        ('test_subscribe', False),
-        ('test_subscribe_limit', False),
-        ('test_publish', True),
-        ('test_multiple_subscribers', True),
-        ('test_get_stats', False),
-        ('test_state_transitions', True)
-    ]
-    
-    for method_name, is_async in test_methods:
-        try:
-            print(f"  {method_name}...", end=" ")
-            method = getattr(event_tests, method_name)
-            if is_async:
-                asyncio.run(method())
-            else:
-                method()
-            print("✓")
-            passed += 1
-        except Exception as e:
-            print(f"✗ ({str(e)})")
-            failed += 1
+    for name, method in event_tests.__class__.__dict__.items():
+        if is_test_method(name, method):
+            if name == 'test_handler':  # Skip helper method
+                continue
+            try:
+                print(f"  {name}...", end=" ")
+                bound_method = getattr(event_tests, name)
+                if is_async_method(bound_method):
+                    asyncio.run(bound_method())
+                    print(f"\n  {name}... ", end="")
+                else:
+                    bound_method()
+                print("✓")
+                passed += 1
+            except Exception as e:
+                print(f"✗ ({str(e)})")
+                failed += 1
     
     # Run IoTController Tests
     print("\nRunning IoTController Tests:")
     iot_tests = TestIoTController()
     
-    iot_test_methods = [
-        ('test_init', False),
-        ('test_initialize', True),
-        ('test_error_handling', True)
-    ]
+    for name, method in iot_tests.__class__.__dict__.items():
+        if is_test_method(name, method):
+            try:
+                print(f"  {name}...", end=" ")
+                bound_method = getattr(iot_tests, name)
+                if is_async_method(bound_method):
+                    asyncio.run(bound_method())
+                    print(f"\n  {name}... ", end="")
+                else:
+                    bound_method()
+                print("✓")
+                passed += 1
+            except Exception as e:
+                print(f"✗ ({str(e)})")
+                failed += 1
+                
+    # Run Rules Tests
+    print("\nRunning Rules Tests:")
+    rules_tests = TestRules()
     
-    for method_name, is_async in iot_test_methods:
-        try:
-            print(f"  {method_name}...", end=" ")
-            method = getattr(iot_tests, method_name)
-            if is_async:
-                asyncio.run(method())
-            else:
-                method()
-            print("Passed ✓")
-            passed += 1
-        except Exception as e:
-            print(f"Failed✗ ({str(e)})")
-            failed += 1
+    for name, method in rules_tests.__class__.__dict__.items():
+        if is_test_method(name, method):
+            try:
+                print(f"  {name}...", end=" ")
+                bound_method = getattr(rules_tests, name)
+                if is_async_method(bound_method):
+                    asyncio.run(bound_method())
+                    print(f"\n  {name}... ", end="")
+                else:
+                    bound_method()
+                print("✓")
+                passed += 1
+            except Exception as e:
+                print(f"✗ ({str(e)})")
+                failed += 1
     
     # Clean up
     gc.collect()

@@ -53,3 +53,39 @@ class TestIoTController(TestCase):
         test_controller.events = None  # Break circular references
         test_controller = None  # Remove reference
         gc.collect()  # Force garbage collection 
+
+    async def test_state_transitions(self):
+        """Test state machine transitions"""
+        # Test initial state
+        self.assertEqual(self.controller.state, "initializing")
+        
+        # Test transition to ready
+        await self.controller.initialize()
+        self.assertEqual(self.controller.state, "ready")
+        
+        # Test transition to running
+        self.controller.state = "running"
+        self.assertEqual(self.controller.state, "running")
+        
+        # Test invalid state transition
+        try:
+            self.controller.state = "invalid_state"
+            self.fail("Should not allow invalid state")
+        except ValueError:
+            pass
+
+    async def test_event_subscription(self):
+        """Test controller event subscriptions"""
+        # Check that controller subscribes to required events
+        self.assertIn("system_command", self.controller.events.subscribers)
+        self.assertIn("system_state", self.controller.events.subscribers)
+        self.assertIn("system_error", self.controller.events.subscribers)
+
+    async def test_command_handling(self):
+        """Test command processing"""
+        # Initialize controller
+        await self.controller.initialize()
+        
+        # Test stop command
+        await self.controller.events.publish("system_command", {"command": "stop"})
+        self.assertEqual(self.controller.state, "ready") 

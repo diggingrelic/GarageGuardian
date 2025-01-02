@@ -2,6 +2,7 @@ from machine import Pin # type: ignore
 import asyncio
 from collections import deque
 from .core.Events import EventSystem
+from .core.Rules import RulesEngine
 import time
 import gc
 from config import PinConfig
@@ -20,8 +21,9 @@ class IoTController:
         self.state = SystemState.INITIALIZING
         self.error_log = deque((), 10)
         
-        # Initialize event system
+        # Initialize systems
         self.events = EventSystem()
+        self.rules = RulesEngine(self.events)  # Add Rules Engine
         
     async def initialize(self):
         print("Initializing...")
@@ -31,14 +33,20 @@ class IoTController:
         self.events.subscribe("system_heartbeat", self._handle_heartbeat)
         self.events.subscribe("system_command", self._handle_command)
         
+        # Initialize rules engine
+        await self._setup_default_rules()
+        
         # Set system to ready state
         self.state = SystemState.READY
         await self.events.publish("system_state", {
             "state": self.state,
             "timestamp": time.time()
         })
-        
         return True
+        
+    async def _setup_default_rules(self):
+        """Setup default system rules - override in subclasses"""
+        pass  # Default rules can be added by subclassing
 
     async def run(self):
         print("Running...")
