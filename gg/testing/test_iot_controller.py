@@ -43,4 +43,8 @@ class TestIoTController(TestCase):
         
         # Test error state transition
         self.controller.state = "error"
-        self.assertEqual(self.controller.state, "error") 
+        self.assertEqual(self.controller.state, "error")
+        
+        # Clean up
+        self.controller.error_log.clear()
+        self.controller.state = "initializing"  # Reset state 
