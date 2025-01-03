@@ -1,12 +1,18 @@
-from .microtest import TestCase
-from ..core.Rules import Rule, RuleCondition, RulePriority, RuleStatus
-from ..core.Events import EventSystem
+from ..microtest import TestCase
+from ...core.Events import EventSystem
+from ...core.Rules import Rule, RuleCondition, RulePriority, RuleStatus
+import gc
 
 class TestRules(TestCase):
     def __init__(self):
         super().__init__()
         self.events = EventSystem()
         self.rule_triggered = False
+        
+    def tearDown(self):
+        self.events = EventSystem()
+        self.rule_triggered = False
+        gc.collect()
         
     def test_rule_creation(self):
         """Test rule creation and validation"""

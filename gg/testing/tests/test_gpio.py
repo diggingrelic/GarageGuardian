@@ -1,6 +1,6 @@
-from .microtest import TestCase
-from ..hardware.GPIO import GPIOManager
-from ..hardware.MockHAL import MockPin
+from ..microtest import TestCase
+from ...hardware.GPIO import GPIOManager
+from ...hardware.MockHAL import MockPin
 
 class TestGPIO(TestCase):
     def __init__(self):

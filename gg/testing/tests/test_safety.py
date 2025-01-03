@@ -1,12 +1,17 @@
-from .microtest import TestCase
-from ..core.Safety import SafetyMonitor, SafetyCondition, SafetySeverity, SafetyStatus
+from ..microtest import TestCase
+from ...core.Safety import SafetyMonitor, SafetyCondition, SafetyStatus, SafetySeverity
+import gc
 
 class TestSafety(TestCase):
     def __init__(self):
-        """Initialize test safety monitor"""
         super().__init__()
         self.safety = SafetyMonitor()
         self.violation_triggered = False
+        
+    def tearDown(self):
+        self.safety = SafetyMonitor()
+        self.violation_triggered = False
+        gc.collect()
         
     def test_condition_creation(self):
         """Test safety condition creation and properties"""

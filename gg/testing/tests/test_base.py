@@ -1,8 +1,9 @@
-from .microtest import TestCase
-from ..controllers.Base import BaseController
-from .mocks import MockPin
-from ..core.Safety import SafetyMonitor
-from ..core.Events import EventSystem
+from ..microtest import TestCase
+from ...controllers.Base import BaseController
+from ..mocks import MockPin
+from ...core.Safety import SafetyMonitor
+from ...core.Events import EventSystem
+import gc
 
 class TestBaseController(TestCase):
     def __init__(self):
@@ -11,6 +12,13 @@ class TestBaseController(TestCase):
         self.safety = SafetyMonitor()
         self.events = EventSystem()
         self.controller = BaseController("test", self.hardware, self.safety, self.events)
+        
+    def tearDown(self):
+        self.events = EventSystem()
+        self.safety = SafetyMonitor()
+        self.hardware = MockPin("TEST", MockPin.OUT)
+        self.controller = BaseController("test", self.hardware, self.safety, self.events)
+        gc.collect()
         
     async def test_initialization(self):
         """Test basic initialization"""

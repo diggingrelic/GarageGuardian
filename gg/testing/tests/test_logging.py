@@ -1,5 +1,5 @@
-from .microtest import TestCase
-from ..logging.Log import LOG_LEVEL, logger, LOG_LEVELS
+from ..microtest import TestCase
+from ...logging.Log import LOG_LEVEL, logger, LOG_LEVELS
 import logging
 
 class TestLogging(TestCase):

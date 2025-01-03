@@ -3,6 +3,14 @@ class TestCase:
         self.failed = False
         self.failure_message = ""
 
+    def setUp(self):
+        """Optional setup before each test"""
+        pass
+
+    def tearDown(self):
+        """Optional cleanup after each test"""
+        pass
+
     def assertTrue(self, condition, msg=None):
         if not condition:
             self.failed = True
