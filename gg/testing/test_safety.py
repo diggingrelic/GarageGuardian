@@ -2,11 +2,11 @@ from .microtest import TestCase
 from ..core.Safety import SafetyMonitor, SafetyCondition, SafetySeverity, SafetyStatus
 
 class TestSafety(TestCase):
-    def setUp(self):
-        """Setup test safety monitor"""
+    def __init__(self):
+        """Initialize test safety monitor"""
+        super().__init__()
         self.safety = SafetyMonitor()
         self.violation_triggered = False
-        self.recovery_triggered = False
         
     def test_condition_creation(self):
         """Test safety condition creation and properties"""

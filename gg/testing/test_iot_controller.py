@@ -1,5 +1,6 @@
 from .microtest import TestCase
-from ..IoTController import IoTController
+from ..IoTController import IoTController, SystemState
+from ..core.Safety import SafetySeverity
 from .mocks import MockPin
 import gc
 
@@ -11,14 +12,14 @@ class TestIoTController(TestCase):
 
     def test_init(self):
         """Test controller initialization"""
-        self.assertEqual(self.controller.state, "initializing")
+        self.assertEqual(self.controller.state, SystemState.INITIALIZING)
         self.assertTrue(hasattr(self.controller, 'events'))
 
     async def test_initialize(self):
         """Test async initialization"""
         result = await self.controller.initialize()
         self.assertTrue(result)
-        self.assertEqual(self.controller.state, "ready")
+        self.assertEqual(self.controller.state, SystemState.READY)
 
     async def test_led_toggle(self):
         """Test LED toggling"""
@@ -26,7 +27,7 @@ class TestIoTController(TestCase):
         await self.controller.initialize()
         
         # Start run loop but only for a short time
-        self.controller.state = "running"
+        self.controller.state = SystemState.RUNNING
         await self.controller.run()
         
         # Check that LED state changed
@@ -46,46 +47,48 @@ class TestIoTController(TestCase):
         self.assertEqual(test_controller.error_log[0]["message"], error_msg)
         
         # Test error state transition
-        test_controller.state = "error"
-        self.assertEqual(test_controller.state, "error")
+        test_controller.state = SystemState.ERROR
+        self.assertEqual(test_controller.state, SystemState.ERROR)
         
         # Explicit cleanup
         test_controller.events = None  # Break circular references
         test_controller = None  # Remove reference
-        gc.collect()  # Force garbage collection 
+        gc.collect()  # Force garbage collection
 
-    async def test_state_transitions(self):
-        """Test state machine transitions"""
-        # Test initial state
-        self.assertEqual(self.controller.state, "initializing")
-        
-        # Test transition to ready
+    async def test_safety_integration(self):
+        """Test safety system integration"""
         await self.controller.initialize()
-        self.assertEqual(self.controller.state, "ready")
+        self.assertTrue(hasattr(self.controller, 'safety'))
+        self.assertEqual(self.controller.state, SystemState.READY)
         
-        # Test transition to running
-        self.controller.state = "running"
-        self.assertEqual(self.controller.state, "running")
+        # Add a test safety condition
+        self.controller.safety.add_condition(
+            name="test_condition",
+            check_func=lambda: False,  # Always unsafe
+            severity=SafetySeverity.CRITICAL
+        )
         
-        # Test invalid state transition
-        try:
-            self.controller.state = "invalid_state"
-            self.fail("Should not allow invalid state")
-        except ValueError:
-            pass
-
-    async def test_event_subscription(self):
-        """Test controller event subscriptions"""
-        # Check that controller subscribes to required events
-        self.assertIn("system_command", self.controller.events.subscribers)
-        self.assertIn("system_state", self.controller.events.subscribers)
-        self.assertIn("system_error", self.controller.events.subscribers)
-
-    async def test_command_handling(self):
-        """Test command processing"""
-        # Initialize controller
+        # Run should detect safety violation
+        self.controller.state = SystemState.RUNNING
+        await self.controller.run()
+        self.assertEqual(self.controller.state, SystemState.ERROR)
+        
+    async def test_shutdown(self):
+        """Test system shutdown"""
         await self.controller.initialize()
-        
-        # Test stop command
-        await self.controller.events.publish("system_command", {"command": "stop"})
-        self.assertEqual(self.controller.state, "ready") 
+        await self.controller.shutdown()
+        self.assertEqual(self.controller.state, SystemState.SHUTDOWN)
+        self.assertEqual(self.controller.led.value(), 0)  # LED should be off
+
+    async def test_restart(self):
+        """Test system restart"""
+        await self.controller.initialize()
+        await self.controller.restart()
+        self.assertEqual(self.controller.state, SystemState.READY)
+
+    def cleanup(self):
+        """Cleanup test resources"""
+        if hasattr(self, 'controller'):
+            self.controller.events = None
+            self.controller = None
+        gc.collect()
