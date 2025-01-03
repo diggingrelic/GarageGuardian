@@ -1,65 +1,86 @@
 from ..microtest import TestCase
+from ...core.Rules import (
+    RulesEngine, Rule,
+    PRIORITY_LOW, PRIORITY_MEDIUM, PRIORITY_HIGH, PRIORITY_CRITICAL
+)
 from ...core.Events import EventSystem
-from ...core.Rules import Rule, RuleCondition, RulePriority, RuleStatus
 import gc
 
 class TestRules(TestCase):
-    def __init__(self):
-        super().__init__()
+    def setUp(self):
+        """Initialize test components"""
         self.events = EventSystem()
-        self.rule_triggered = False
+        self.rules = RulesEngine(self.events)
         
     def tearDown(self):
-        self.events = EventSystem()
-        self.rule_triggered = False
+        """Clean up after test"""
+        self.rules = None
+        self.events = None
         gc.collect()
         
-    def test_rule_creation(self):
-        """Test rule creation and validation"""
-        condition = RuleCondition(lambda: True, "test_event")
+    async def test_rule_creation(self):
+        """Test rule creation and properties"""
+        await self.rules.start()
         rule = Rule(
             name="test_rule",
-            conditions=condition,
-            actions=lambda: setattr(self, 'rule_triggered', True),
-            priority=RulePriority.HIGH
+            condition_func=lambda: True,
+            action_func=lambda: None,
+            priority=PRIORITY_HIGH
         )
-        self.assertEqual(rule.status, RuleStatus.ACTIVE)
-        self.assertEqual(rule.priority, RulePriority.HIGH)
+        self.assertEqual(rule.name, "test_rule")
+        self.assertEqual(rule.priority, PRIORITY_HIGH)
+        self.assertTrue(rule.enabled)
+        
+    async def test_add_rule(self):
+        """Test adding rules to engine"""
+        await self.rules.start()
+        self.rules.add_rule(
+            name="test_rule",
+            condition_func=lambda: True,
+            action_func=lambda: None,
+            priority=PRIORITY_HIGH
+        )
+        self.assertTrue("test_rule" in self.rules.rules)
         
     async def test_rule_evaluation(self):
-        """Test rule evaluation and triggering"""
-        condition = RuleCondition(lambda: True, "test_event")
-        rule = Rule(
+        """Test rule evaluation and execution"""
+        action_called = False
+        
+        async def test_action():
+            nonlocal action_called
+            action_called = True
+            
+        await self.rules.start()
+        self.rules.add_rule(
             name="test_rule",
-            conditions=condition,
-            actions=lambda: setattr(self, 'rule_triggered', True)
-        )
-        result = await rule.evaluate(self.events)
-        self.assertTrue(result)
-        self.assertTrue(self.rule_triggered)
-        
-    async def test_multiple_conditions(self):
-        """Test rule with multiple conditions"""
-        self.condition1_met = False
-        self.condition2_met = False
-        
-        rule = Rule(
-            name="test_multi",
-            conditions=[
-                RuleCondition(lambda: self.condition1_met, "event1"),
-                RuleCondition(lambda: self.condition2_met, "event2")
-            ],
-            actions=lambda: setattr(self, 'rule_triggered', True),
-            priority=RulePriority.CRITICAL,
-            require_all=True
+            condition_func=lambda: True,
+            action_func=test_action
         )
         
-        # Test with not all conditions met
-        result = await rule.evaluate(self.events)
-        self.assertFalse(result)
+        await self.rules.evaluate_all()
+        self.assertTrue(action_called)
         
-        # Test with all conditions met
-        self.condition1_met = True
-        self.condition2_met = True
-        result = await rule.evaluate(self.events)
-        self.assertTrue(result) 
+    async def test_rule_priority(self):
+        """Test all rule priority levels"""
+        for priority in [PRIORITY_LOW, PRIORITY_MEDIUM, PRIORITY_HIGH, PRIORITY_CRITICAL]:
+            rule = Rule(
+                name=f"test_priority_{priority}",
+                condition_func=lambda: True,
+                action_func=lambda: None,
+                priority=priority
+            )
+            self.assertEqual(rule.priority, priority)
+            
+    async def test_rule_disable(self):
+        """Test rule enabling/disabling"""
+        self.rules.add_rule(
+            name="test_rule",
+            condition_func=lambda: True,
+            action_func=lambda: None
+        )
+        
+        self.rules.disable_rule("test_rule")
+        self.assertFalse(self.rules.rules["test_rule"].enabled)
+        
+        self.rules.enable_rule("test_rule")
+        self.assertTrue(self.rules.rules["test_rule"].enabled)

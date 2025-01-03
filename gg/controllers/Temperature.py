@@ -1,4 +1,4 @@
-from ..hardware.interfaces.Temperature import TemperatureDevice
+from ..interfaces.Temperature import TemperatureDevice
 from .Base import BaseController
 
 class TemperatureController(BaseController):

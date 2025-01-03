@@ -39,4 +39,9 @@ class TestCase:
         if item not in container:
             self.failed = True
             self.failure_message = msg or f"Assertion failed: {item} not in {container}"
-            raise AssertionError(self.failure_message) 
+            raise AssertionError(self.failure_message)
+
+    def assertGreater(self, first, second, msg=None):
+        """Verify that first is greater than second"""
+        if not first > second:
+            raise AssertionError(msg or f"{first} is not greater than {second}") 

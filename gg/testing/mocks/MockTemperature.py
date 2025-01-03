@@ -1,5 +1,4 @@
-from ...hardware.interfaces.Temperature import TemperatureDevice
-from typing import Tuple
+from ...interfaces.Temperature import TemperatureDevice
 
 class MockTemperature(TemperatureDevice):
     """Mock implementation of a temperature sensor for testing
@@ -7,40 +6,32 @@ class MockTemperature(TemperatureDevice):
     Simulates a temperature/humidity sensor with configurable readings.
     """
     
-    def __init__(self, initial_temp: float = 20.0, initial_humidity: float = 50.0):
+    def __init__(self, initial_temp=20.0, initial_humidity=50.0):
         super().__init__()
         self._temperature = initial_temp
         self._humidity = initial_humidity
-        self.record_reading()
+        self._last_reading = 0.0  # Direct assignment instead of await
         
-    def read(self) -> Tuple[float, float]:
+    async def read(self):
         """Read current mock temperature and humidity"""
-        self.record_reading()
+        await self.record_reading()
         return (self._temperature, self._humidity)
         
-    def is_working(self) -> bool:
+    async def is_working(self):
         """Check if mock sensor is functioning"""
-        return self._error_count < self._max_errors
+        return await super().is_working()
         
     # Test helper methods
-    def set_temperature(self, temp: float):
-        """Set the mock temperature reading
-        
-        Args:
-            temp (float): Temperature in Celsius
-        """
+    async def set_temperature(self, temp):
+        """Set the mock temperature reading"""
         self._temperature = temp
-        self.record_reading()
+        await self.record_reading()
         
-    def set_humidity(self, humidity: float):
-        """Set the mock humidity reading
-        
-        Args:
-            humidity (float): Humidity percentage
-        """
+    async def set_humidity(self, humidity):
+        """Set the mock humidity reading"""
         self._humidity = humidity
-        self.record_reading()
+        await self.record_reading()
         
-    def simulate_error(self):
+    async def simulate_error(self):
         """Simulate a sensor error"""
-        self.record_error() 
+        await self.record_error() 

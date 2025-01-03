@@ -1,53 +1,60 @@
-from ...hardware.interfaces.Motion import MotionDevice
-import time
+from ...interfaces.Motion import MotionDevice
 
 class MockMotion(MotionDevice):
     """Mock implementation of a motion sensor for testing
     
-    Simulates a motion sensor with configurable sensitivity
-    and detection state.
+    Simulates a motion sensor with configurable sensitivity.
     """
     
-    def __init__(self, initial_sensitivity: int = 5):
+    def __init__(self):
         super().__init__()
         self._motion_detected = False
-        self._sensitivity = initial_sensitivity
-        self._last_motion = 0.0
-        self.record_reading()
+        self._sensitivity = 5  # Mid-range default
+        self._last_reading = 0.0  # Direct assignment instead of await
         
-    def detect_motion(self) -> bool:
-        """Check if mock motion is detected"""
-        self.record_reading()
+    async def detect_motion(self):
+        """Check if motion is currently detected"""
+        await self.record_reading()
         return self._motion_detected
         
-    def get_last_motion(self) -> float:
-        """Get timestamp of last mock motion"""
-        return self._last_motion
+    async def get_last_motion(self):
+        """Get timestamp of last motion detection"""
+        return await self.last_reading_time()
         
-    def get_sensitivity(self) -> int:
-        """Get current mock sensitivity level"""
+    async def get_sensitivity(self):
+        """Get current sensitivity setting"""
+        await self.record_reading()
         return self._sensitivity
         
-    def set_sensitivity(self, level: int) -> bool:
-        """Set mock sensitivity level"""
-        if not 1 <= level <= 10:
-            self.record_error()
-            return False
-        self._sensitivity = level
-        return True
+    async def set_sensitivity(self, level):
+        """Set motion detection sensitivity
         
-    def is_working(self) -> bool:
+        Args:
+            level: Sensitivity level (1-10)
+        Returns:
+            bool: True if setting was valid and applied
+        """
+        if 1 <= level <= 10:
+            self._sensitivity = level
+            await self.record_reading()
+            return True
+        return False
+        
+    async def is_working(self):
         """Check if mock sensor is functioning"""
-        return self._error_count < self._max_errors
+        return await super().is_working()
         
     # Test helper methods
-    def simulate_motion(self):
+    async def simulate_motion(self):
         """Simulate motion detection"""
         self._motion_detected = True
-        self._last_motion = time.time()
-        self.record_reading()
+        await self.record_reading()
         
-    def simulate_clear(self):
+    async def simulate_clear(self):
         """Simulate no motion"""
         self._motion_detected = False
-        self.record_reading() 
+        await self.record_reading()
+        
+    async def simulate_error(self):
+        """Simulate a sensor error"""
+        await self.record_error() 

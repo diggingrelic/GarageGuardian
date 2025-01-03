@@ -1,24 +1,41 @@
 from ..microtest import TestCase
 from ...controllers.Base import BaseController
-from ..mocks import MockPin
-from ...core.Safety import SafetyMonitor
 from ...core.Events import EventSystem
+from ...core.Safety import SafetyMonitor
+from ..mocks.MockDoor import MockDoor
 import gc
 
 class TestBaseController(TestCase):
     def __init__(self):
+        """Initialize the test case"""
         super().__init__()
-        self.hardware = MockPin("TEST", MockPin.OUT)
-        self.safety = SafetyMonitor()
+        self.controller = None
+        self.hardware = None
+        self.events = None
+        self.safety = None
+        
+    def setUp(self):
+        """Initialize test components"""
+        self.hardware = MockDoor()
         self.events = EventSystem()
+        self.safety = SafetyMonitor()
         self.controller = BaseController("test", self.hardware, self.safety, self.events)
         
     def tearDown(self):
-        self.events = EventSystem()
-        self.safety = SafetyMonitor()
-        self.hardware = MockPin("TEST", MockPin.OUT)
-        self.controller = BaseController("test", self.hardware, self.safety, self.events)
+        """Clean up after test"""
+        if hasattr(self, 'controller') and self.controller:
+            self.controller.cleanup()
+        self.controller = None
+        self.hardware = None
+        self.events = None
+        self.safety = None
         gc.collect()
+        
+    async def test_cleanup(self):
+        """Test cleanup handling"""
+        self.assertTrue(self.controller.enabled)
+        self.controller.cleanup()
+        self.assertFalse(self.controller.enabled)
         
     async def test_initialization(self):
         """Test basic initialization"""
@@ -27,7 +44,7 @@ class TestBaseController(TestCase):
         self.assertTrue(self.controller.enabled)
         self.assertEqual(self.controller.name, "test")
         
-    def test_attributes(self):
+    async def test_attributes(self):
         """Test controller attributes"""
         self.assertEqual(self.controller.hardware, self.hardware)
         self.assertEqual(self.controller.safety, self.safety)
@@ -36,9 +53,4 @@ class TestBaseController(TestCase):
     async def test_update(self):
         """Test update method (should do nothing in base)"""
         await self.controller.update()
-        self.assertTrue(True)  # Just verify it doesn't raise
-        
-    def test_cleanup(self):
-        """Test cleanup handling"""
-        self.controller.cleanup()
-        self.assertTrue(self.controller.enabled)  # Should still be enabled after cleanup 
+        self.assertTrue(True)  # Just verify it doesn't raise 

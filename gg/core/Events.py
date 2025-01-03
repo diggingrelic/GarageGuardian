@@ -2,7 +2,7 @@ from micropython import const # type: ignore
 import asyncio # noqa: F401
 
 # Event system constants
-MAX_SUBSCRIBERS = const(20)
+MAX_SUBSCRIBERS = 10  # Maximum subscribers per event type
 
 class Event:
     """Event object for type safety and future extensibility
@@ -30,67 +30,57 @@ class Event:
         return self.name
 
 class EventSystem:
-    """Event system for managing publish/subscribe patterns
+    """Simple event system for MicroPython"""
     
-    The EventSystem provides a way to decouple components through events.
-    It supports both synchronous and asynchronous event handlers.
-    
-    Attributes:
-        subscribers (dict): Dictionary mapping event names to lists of handlers
-        stats (dict): Statistics about processed, dropped, and error events
-    """
     def __init__(self):
-        """Initialize a new event system"""
-        self.subscribers = {}
+        self.subscribers = {}  # event_type -> list of handlers
         self.stats = {
-            'processed': 0,
-            'dropped': 0,
-            'errors': 0
+            "published": 0,
+            "handled": 0,
+            "errors": 0
         }
-
-    def subscribe(self, event_name, handler):
-        """Subscribe a handler to an event
         
-        Args:
-            event_name (str): Name of the event to subscribe to
-            handler (callable): Function to handle the event
-            
-        Returns:
-            bool: True if subscription successful, False if at subscriber limit
-            
-        Example:
-            >>> def on_temperature(event):
-            ...     print(f"Temperature: {event.data}")
-            >>> events.subscribe("temperature_change", on_temperature)
-        """
-        if event_name not in self.subscribers:
-            self.subscribers[event_name] = []
-        if len(self.subscribers[event_name]) >= MAX_SUBSCRIBERS:
-            return False
-        self.subscribers[event_name].append(handler)
+    async def start(self):
+        """Initialize the event system"""
+        self.subscribers = {}
         return True
-
-    async def publish(self, event_name, event_data=None):
-        """Publish an event to all subscribers
+        
+    async def stop(self):
+        """Clean shutdown of event system"""
+        self.subscribers = {}
+        return True
+        
+    def subscribe(self, event_type: str, handler) -> bool:
+        """Subscribe to an event type
         
         Args:
-            event_name (str): Name of the event to publish
-            event_data (any, optional): Data to include with the event
-            
-        Example:
-            >>> await events.publish("temperature_change", {"temp": 25.5})
+            event_type: Type of event to subscribe to
+            handler: Async function to handle event
+        Returns:
+            bool: True if subscription successful
         """
-        event = Event(event_name, event_data)
-        if event_name in self.subscribers:
-            for handler in self.subscribers[event_name]:
+        if event_type not in self.subscribers:
+            self.subscribers[event_type] = []
+            
+        if len(self.subscribers[event_type]) >= MAX_SUBSCRIBERS:
+            return False
+            
+        self.subscribers[event_type].append(handler)
+        return True
+        
+    async def publish(self, event_type: str, data=None):
+        """Publish an event
+        
+        Args:
+            event_type: Type of event to publish
+            data: Optional data to pass to handlers
+        """
+        self.stats["published"] += 1
+        
+        if event_type in self.subscribers:
+            for handler in self.subscribers[event_type]:
                 try:
-                    if hasattr(handler, '__await__'):
-                        await handler(event)
-                    else:
-                        handler(event)
-                    self.stats['processed'] += 1
-                except Exception as e:
-                    self.stats['errors'] += 1
-                    raise e
-        else:
-            self.stats['dropped'] += 1
+                    await handler({"type": event_type, "data": data})
+                    self.stats["handled"] += 1
+                except Exception:
+                    self.stats["errors"] += 1

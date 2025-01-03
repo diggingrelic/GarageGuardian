@@ -1,4 +1,4 @@
-from ..hardware.interfaces.Door import DoorDevice
+from ..interfaces.Door import DoorDevice
 from .Base import BaseController
 
 class DoorController(BaseController):

@@ -1,4 +1,4 @@
-from ..hardware.interfaces.Motion import MotionDevice
+from ..interfaces.Motion import MotionDevice
 from .Base import BaseController
 
 class MotionController(BaseController):

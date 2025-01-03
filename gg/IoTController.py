@@ -1,14 +1,13 @@
-from machine import Pin # type: ignore
-import asyncio
-from collections import deque
 from .core.Events import EventSystem
 from .core.Rules import RulesEngine
 from .core.Safety import SafetyMonitor
+from .controllers.Base import BaseController
+from .logging.Log import info, error, critical
+import asyncio
 import time
-from config import PinConfig
-from gg.logging.Log import info, error, critical
 
 class SystemState:
+    """System state enumeration"""
     INITIALIZING = "initializing"
     READY = "ready"
     RUNNING = "running"
@@ -16,114 +15,122 @@ class SystemState:
     SHUTDOWN = "shutdown"
 
 class IoTController:
+    """Main controller for IoT system
+    
+    Manages device controllers, coordinates monitoring,
+    and integrates with core systems (Events, Rules, Safety).
+    
+    Example usage:
+        controller = IoTController()
+        door = DoorController(RealDoor(sensor_pin=16, lock_pin=17), controller.events)
+        controller.register_device("main_door", door)
+        await controller.start()
+    """
+    
     def __init__(self):
-        self.led = Pin(PinConfig.STATUS_LED, Pin.OUT)
-        self.state = SystemState.INITIALIZING
-        self.error_log = deque((), 10)
-        
-        # Initialize systems
         self.events = EventSystem()
         self.rules = RulesEngine(self.events)
-        self.safety = SafetyMonitor(self.events)  # Add Safety Monitor
+        self.safety = SafetyMonitor()
+        self.devices = {}  # type: dict[str, BaseController]
+        self.state = SystemState.INITIALIZING
+        self._monitoring = False
         
-    async def initialize(self):
-        info("Initializing...")
-        # Subscribe to system events
-        self.events.subscribe("system_state", self._handle_state_change)
-        self.events.subscribe("system_error", self._handle_error)
-        self.events.subscribe("system_command", self._handle_command)
-        self.events.subscribe("system_heartbeat", self._handle_heartbeat)
-        self.events.subscribe("system_command", self._handle_command)
+    def register_device(self, name: str, device: BaseController) -> bool:
+        """Register a device controller
         
-        # Initialize rules engine
-        await self._setup_default_rules()
-        
-        # Initialize safety system
-        await self._setup_safety_checks()
-        
-        # Set system to ready state
-        self.state = SystemState.READY
-        await self.events.publish("system_state", {
-            "state": self.state,
-            "timestamp": time.time()
-        })
+        Args:
+            name (str): Unique name for the device
+            device (BaseController): Device controller instance
+            
+        Returns:
+            bool: True if registration successful
+        """
+        if name in self.devices:
+            error(f"Device {name} already registered")
+            return False
+            
+        self.devices[name] = device
+        info(f"Device {name} registered")
         return True
         
-    async def _setup_safety_checks(self):
-        """Setup safety checks - override in subclasses"""
-        pass  # Safety checks will be added by subclassing
+    async def initialize(self):
+        """Initialize the IoT controller system"""
+        info("Starting IoT controller")
+        self.state = SystemState.INITIALIZING
+        
+        # Initialize each subsystem
+        if not await self.events.start():
+            return False
+        if not await self.safety.start():
+            return False
+        if not await self.rules.start():
+            return False
+            
+        self._monitoring = True
+        self.state = SystemState.RUNNING
+        return True
         
     async def run(self):
-        """Main run loop"""
-        if self.state == SystemState.RUNNING:
-            # Check safety conditions first
-            if not await self.safety.check_safety():
-                error("Safety check failed")
-                await self._handle_safety_violation()
-                return
+        """Run one monitoring cycle"""
+        if self._monitoring:
+            try:
+                await self._monitor_cycle()
+            except Exception as e:
+                error(f"Monitoring error: {e}")
+                self.state = SystemState.ERROR
                 
-            # If safe, process rules
-            await self.rules.process_rules()
+    async def _monitor_cycle(self):
+        """Run one monitoring cycle
+        
+        Checks all devices, evaluates rules, and verifies safety.
+        """
+        # Monitor all devices
+        for name, device in self.devices.items():
+            try:
+                await device.monitor()
+            except Exception as e:
+                error(f"Device {name} monitoring failed: {e}")
                 
-    async def _handle_safety_violation(self):
-        """Handle safety violations"""
-        critical_conditions = self.safety.get_critical_conditions()
-        if critical_conditions:
-            critical(f"Critical safety violation: {critical_conditions}")
-            await self.safety.emergency_stop()
+        # Evaluate rules
+        await self.rules.evaluate_all()
+        
+        # Check safety conditions
+        if not await self.safety.check_safety():
+            critical("Safety check failed")
             self.state = SystemState.ERROR
-
-    async def _setup_default_rules(self):
-        """Setup default system rules - override in subclasses"""
-        pass  # Default rules can be added by subclassing
-
-    def _log_error(self, error, level="ERROR"):
-        """Log an error and publish error event"""
-        error_data = {
-            "message": str(error),
-            "level": level,
-            "timestamp": time.time()
-        }
-        self.error_log.append(error_data)
-        # Publish error event
-        asyncio.create_task(self.events.publish("system_error", error_data))
-
-    async def _handle_state_change(self, event):
-        """Handle system state change events"""
-        info(f"System state changed: {event.data['state']}")
-        # Add any state transition logic here
-
-    async def _handle_error(self, event):
-        """Handle system error events"""
-        error(f"System error: {event.data['message']} (Level: {event.data['level']})")
-
+            
     async def _handle_heartbeat(self, event):
-        """Handle system heartbeat events"""
-        # We can add system health checks here
-        pass
-
-    async def _handle_command(self, event):
-        """Handle system command events"""
-        if 'command' in event.data:
-            command = event.data['command']
-            if command == 'shutdown':
-                await self.shutdown()
-            elif command == 'restart':
-                await self.restart()
-            # Add more commands as needed
-
-    async def shutdown(self):
-        """Perform a clean shutdown"""
-        info("Shutting down...")
+        """Handle system heartbeat events
+        
+        Updates system state and verifies all subsystems.
+        """
+        if self.state == SystemState.RUNNING:
+            # Verify all devices are working
+            all_working = True
+            for name, device in self.devices.items():
+                if not device.device.is_working():
+                    error(f"Device {name} not working")
+                    all_working = False
+                    
+            if not all_working:
+                self.state = SystemState.ERROR
+                
+    async def safe_shutdown(self):
+        """Perform a clean system shutdown"""
+        info("Shutting down IoT controller")
+        self._monitoring = False
         self.state = SystemState.SHUTDOWN
+        
+        # Publish shutdown event
         await self.events.publish("system_state", {
             "state": self.state,
             "timestamp": time.time()
         })
-        self.led.off()
-
-    async def restart(self):
-        """Restart the controller"""
-        await self.shutdown()
-        self.state = SystemState.INITIALIZING
-        await self.initialize()
+        
+        # Stop subsystems
+        await self.safety.stop()
+        await self.events.stop()
+        
+    def get_device(self, name: str) -> BaseController:
+        """Get a registered device controller by name"""
+        return self.devices.get(name)
