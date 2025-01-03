@@ -1,10 +1,11 @@
-from micropython import const
+from micropython import const #type: ignore
 import time
 import asyncio
+from ..logging.Log import debug, info, warning, error, critical
 
 # Safety constants
 MAX_CONDITIONS = const(20)
-CHECK_TIMEOUT = const(500)
+CHECK_TIMEOUT = const(500)  # ms
 MAX_VIOLATIONS = const(3)
 
 class SafetySeverity:
@@ -36,19 +37,42 @@ class SafetyMonitor:
         self.conditions = {}
         self.event_system = event_system
         self.active = True
+        self.status = SafetyStatus.NORMAL
         self.last_check = 0
         self.check_interval = 1
         self.violation_history = []
-        self.max_history = 20  # Reduced for memory constraints
+        self.max_history = 20
+        self.emergency_stops = []
         
+    def register_emergency_stop(self, stop_func):
+        """Register an emergency stop function"""
+        self.emergency_stops.append(stop_func)
+        
+    async def emergency_stop(self):
+        """Trigger emergency stop"""
+        critical("EMERGENCY STOP TRIGGERED")
+        self.status = SafetyStatus.FAILURE
+        self.active = False
+        
+        for stop_func in self.emergency_stops:
+            try:
+                if asyncio.iscoroutinefunction(stop_func):
+                    await stop_func()
+                else:
+                    stop_func()
+            except Exception as e:
+                error(f"Emergency stop function failed: {e}")
+                
     def add_condition(self, name, check_func, severity, threshold=1, recovery_action=None):
         """Add a safety condition to monitor"""
         if len(self.conditions) >= MAX_CONDITIONS:
+            error("Maximum safety conditions reached")
             raise Exception("Maximum safety conditions reached")
             
         condition = SafetyCondition(name, check_func, severity, threshold)
         condition.recovery_action = recovery_action
         self.conditions[name] = condition
+        debug(f"Safety condition added: {name}")
 
     async def check_safety(self):
         """Check all safety conditions"""
@@ -69,8 +93,10 @@ class SafetyMonitor:
                 if not is_safe:
                     all_safe = False
                     violations.append(condition)
+                    if condition.severity == SafetySeverity.CRITICAL:
+                        await self.emergency_stop()
             except Exception as e:
-                print("Safety check error:", e)
+                error(f"Safety check error: {e}")
                 condition.status = SafetyStatus.FAILURE
                 all_safe = False
 
@@ -82,7 +108,7 @@ class SafetyMonitor:
     async def _check_condition(self, condition):
         """Check a single safety condition"""
         try:
-            if hasattr(condition.check, '__await__'):
+            if asyncio.iscoroutinefunction(condition.check):
                 is_safe = await condition.check()
             else:
                 is_safe = condition.check()
@@ -94,9 +120,11 @@ class SafetyMonitor:
                 if condition.violation_count >= condition.threshold:
                     condition.status = SafetyStatus.VIOLATION
                     condition.last_violation = time.time()
+                    warning(f"Safety violation: {condition.name}")
                     return False
                 else:
                     condition.status = SafetyStatus.WARNING
+                    info(f"Safety warning: {condition.name}")
             else:
                 condition.status = SafetyStatus.NORMAL
                 condition.violation_count = 0
@@ -104,14 +132,14 @@ class SafetyMonitor:
             return True
 
         except Exception as e:
+            error(f"Condition check error: {e}")
             condition.status = SafetyStatus.FAILURE
-            print("Condition check error:", e)
             return False
 
     async def _handle_violations(self, violations):
         """Handle safety violations"""
         for condition in violations:
-            # Log violation with minimal data
+            # Log violation
             violation_record = {
                 'name': condition.name,
                 'severity': condition.severity,
@@ -125,12 +153,12 @@ class SafetyMonitor:
             # Attempt recovery
             if condition.recovery_action:
                 try:
-                    if hasattr(condition.recovery_action, '__await__'):
+                    if asyncio.iscoroutinefunction(condition.recovery_action):
                         await condition.recovery_action()
                     else:
                         condition.recovery_action()
                 except Exception as e:
-                    print("Recovery action error:", e)
+                    error(f"Recovery action error: {e}")
 
             # Publish event if available
             if self.event_system:
@@ -144,6 +172,7 @@ class SafetyMonitor:
         """Get current safety status"""
         return {
             'active': self.active,
+            'status': self.status,
             'last_check': self.last_check,
             'conditions': {
                 name: {

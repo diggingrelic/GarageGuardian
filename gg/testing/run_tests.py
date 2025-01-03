@@ -1,7 +1,6 @@
 import gc
 import asyncio
-import time
-from ..logging.Log import debug, info
+from ..logging.Log import debug
 
 def is_test_method(name, obj):
     """Check if a method is a test method"""
@@ -19,6 +18,7 @@ def run_tests():
     from .test_iot_controller import TestIoTController
     from .test_rules import TestRules
     from .test_logging import TestLogging
+    from .test_safety import TestSafety
     
     passed = 0
     failed = 0
@@ -94,6 +94,26 @@ def run_tests():
             try:
                 message = f"  {name}..."
                 bound_method = getattr(logging_tests, name)
+                if is_async_method(bound_method):
+                    asyncio.run(bound_method())
+                    message = f"\n  {name}..."
+                else:
+                    bound_method()
+                debug(f"{message} ✓")
+                passed += 1
+            except Exception as e:
+                debug(f"{message} ✗ ({str(e)})")
+                failed += 1
+
+    # Run Safety Tests
+    debug("Running Safety Tests:")
+    safety_tests = TestSafety()
+    
+    for name, method in safety_tests.__class__.__dict__.items():
+        if is_test_method(name, method):
+            try:
+                message = f"  {name}..."
+                bound_method = getattr(safety_tests, name)
                 if is_async_method(bound_method):
                     asyncio.run(bound_method())
                     message = f"\n  {name}..."

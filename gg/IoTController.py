@@ -3,10 +3,10 @@ import asyncio
 from collections import deque
 from .core.Events import EventSystem
 from .core.Rules import RulesEngine
+from .core.Safety import SafetyMonitor
 import time
-import gc
 from config import PinConfig
-from gg.logging.Log import debug, info, warning, error, critical
+from gg.logging.Log import info, error, critical
 
 class SystemState:
     INITIALIZING = "initializing"
@@ -23,18 +23,23 @@ class IoTController:
         
         # Initialize systems
         self.events = EventSystem()
-        self.rules = RulesEngine(self.events)  # Add Rules Engine
+        self.rules = RulesEngine(self.events)
+        self.safety = SafetyMonitor(self.events)  # Add Safety Monitor
         
     async def initialize(self):
         info("Initializing...")
         # Subscribe to system events
         self.events.subscribe("system_state", self._handle_state_change)
         self.events.subscribe("system_error", self._handle_error)
+        self.events.subscribe("system_command", self._handle_command)
         self.events.subscribe("system_heartbeat", self._handle_heartbeat)
         self.events.subscribe("system_command", self._handle_command)
         
         # Initialize rules engine
         await self._setup_default_rules()
+        
+        # Initialize safety system
+        await self._setup_safety_checks()
         
         # Set system to ready state
         self.state = SystemState.READY
@@ -44,35 +49,38 @@ class IoTController:
         })
         return True
         
+    async def _setup_safety_checks(self):
+        """Setup safety checks - override in subclasses"""
+        pass  # Safety checks will be added by subclassing
+        
+    async def run(self):
+        """Main run loop"""
+        if self.state == SystemState.RUNNING:
+            # Check safety conditions first
+            if not await self.safety.check_safety():
+                error("Safety check failed")
+                await self._handle_safety_violation()
+                return
+                
+            # If safe, process rules
+            await self.rules.process_rules()
+                
+    async def _handle_safety_violation(self):
+        """Handle safety violations"""
+        critical_conditions = self.safety.get_critical_conditions()
+        if critical_conditions:
+            critical(f"Critical safety violation: {critical_conditions}")
+            await self.safety.emergency_stop()
+            self.state = SystemState.ERROR
+
     async def _setup_default_rules(self):
         """Setup default system rules - override in subclasses"""
         pass  # Default rules can be added by subclassing
 
-    async def run(self):
-        info("Running...")
-        self.state = SystemState.RUNNING
-        
-        # Publish state change
-        await self.events.publish("system_state", {
-            "state": self.state,
-            "timestamp": time.time()
-        })
-        
-        while self.state == SystemState.RUNNING:
-            self.led.toggle()
-            
-            # Publish heartbeat event
-            await self.events.publish("system_heartbeat", {
-                "led_state": self.led.value(),
-                "uptime": time.time(),
-                "memory_free": gc.mem_free() if hasattr(gc, 'mem_free') else 0
-            })
-            await asyncio.sleep(1)
-
-    def _log_error(self, log_error, level="ERROR"):
+    def _log_error(self, error, level="ERROR"):
         """Log an error and publish error event"""
         error_data = {
-            "message": str(log_error),
+            "message": str(error),
             "level": level,
             "timestamp": time.time()
         }
