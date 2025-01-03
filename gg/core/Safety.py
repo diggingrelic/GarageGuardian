@@ -1,7 +1,7 @@
 from micropython import const #type: ignore
 import time
 import asyncio
-from ..logging.Log import debug, info, warning, error, critical
+from ..logging.Log import info, warning, error, critical
 
 # Safety constants
 MAX_CONDITIONS = const(20)
@@ -23,13 +23,11 @@ class SafetyStatus:
 class SafetyCondition:
     def __init__(self, name, check_func, severity, threshold=1):
         self.name = name
-        self.check = check_func
+        self.check_func = check_func
         self.severity = severity
         self.threshold = threshold
-        self.status = SafetyStatus.NORMAL
         self.violation_count = 0
-        self.last_check = 0
-        self.last_violation = None
+        self.status = SafetyStatus.NORMAL
         self.recovery_action = None
 
 class SafetyMonitor:
@@ -72,7 +70,6 @@ class SafetyMonitor:
         condition = SafetyCondition(name, check_func, severity, threshold)
         condition.recovery_action = recovery_action
         self.conditions[name] = condition
-        debug(f"Safety condition added: {name}")
 
     async def check_safety(self):
         """Check all safety conditions"""
@@ -108,10 +105,10 @@ class SafetyMonitor:
     async def _check_condition(self, condition):
         """Check a single safety condition"""
         try:
-            if asyncio.iscoroutinefunction(condition.check):
-                is_safe = await condition.check()
+            if asyncio.iscoroutinefunction(condition.check_func):
+                is_safe = await condition.check_func()
             else:
-                is_safe = condition.check()
+                is_safe = condition.check_func()
 
             condition.last_check = time.time()
 
