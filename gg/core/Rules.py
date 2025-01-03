@@ -1,166 +1,177 @@
 from micropython import const # type: ignore
-import time
 import asyncio
+from ..logging.Log import debug, error
 
-# Rule constants
+# Rule system constants
 MAX_RULES = const(20)
-MAX_CONDITIONS = const(5)
-EVAL_RETRY = const(3)
-RULE_TIMEOUT = const(1000)  # ms
 
 class RulePriority:
-    CRITICAL = const(0)
-    HIGH = const(1)
-    NORMAL = const(2)
-    LOW = const(3)
+    """Rule priority levels
+    
+    Defines the priority levels for rules, from lowest (LOW)
+    to highest (CRITICAL). Higher priority rules are evaluated first.
+    """
+    LOW = const(0)
+    MEDIUM = const(1)
+    HIGH = const(2)
+    CRITICAL = const(3)
 
 class RuleStatus:
+    """Rule status indicators
+    
+    Defines the possible states of a rule in the system.
+    """
     ACTIVE = "active"
+    INACTIVE = "inactive"
     DISABLED = "disabled"
-    TRIGGERED = "triggered"
-    FAILED = "failed"
-    COOLDOWN = "cooldown"
+    ERROR = "error"
 
 class RuleCondition:
+    """A condition that must be met for a rule to trigger
+    
+    Represents a single condition with its check function and
+    associated event type.
+    
+    Attributes:
+        check_func (callable): Function that returns True if condition is met
+        event_type (str): Type of event this condition responds to
+        last_check (float): Timestamp of last check
+        last_result (bool): Result of last check
+    """
     def __init__(self, check_func, event_type=None):
-        self.check = check_func  # Function that returns bool
-        self.event_type = event_type  # Optional event trigger
+        self.check = check_func
+        self.event_type = event_type
         self.last_check = 0
-        self.last_value = False
+        self.last_result = False
 
 class Rule:
-    def __init__(self, name, conditions, actions, priority=RulePriority.NORMAL, 
-                 cooldown=0, require_all=True):
-        self.name = name
-        self.conditions = []  # List of RuleCondition objects
-        self.actions = actions if isinstance(actions, list) else [actions]
-        self.priority = priority
-        self.cooldown = cooldown
-        self.require_all = require_all  # True=AND, False=OR
-        self.status = RuleStatus.ACTIVE
-        self.last_triggered = 0
-        self.trigger_count = 0
-        self.last_error = None
-        self.retry_count = 0
-        self.event_triggers = set()  # Track which events can trigger this rule
+    """A rule that can trigger actions based on conditions
+    
+    Rules combine conditions and actions with priority levels to
+    create automated responses to system events.
+    
+    Attributes:
+        name (str): Name of the rule
+        conditions (list): List of RuleConditions to check
+        actions (callable): Function to call when rule triggers
+        priority (RulePriority): Priority level of the rule
+        status (RuleStatus): Current status of the rule
+        require_all (bool): Whether all conditions must be met
         
-        # Setup conditions
-        for condition in conditions if isinstance(conditions, list) else [conditions]:
-            if isinstance(condition, RuleCondition):
-                self.conditions.append(condition)
-                if condition.event_type:
-                    self.event_triggers.add(condition.event_type)
-            else:
-                # Convert simple function to RuleCondition
-                self.conditions.append(RuleCondition(condition))
+    Example:
+        >>> def temp_high(): return sensor.temp > 30
+        >>> def fan_on(): fan.start()
+        >>> rule = Rule("high_temp", temp_high, fan_on, RulePriority.HIGH)
+    """
+    def __init__(self, name, conditions, actions, priority=RulePriority.LOW, require_all=True):
+        self.name = name
+        self.conditions = conditions if isinstance(conditions, list) else [conditions]
+        self.actions = actions
+        self.priority = priority
+        self.status = RuleStatus.ACTIVE
+        self.require_all = require_all
+        self.last_triggered = 0
 
-    def can_trigger(self):
-        """Check if rule can trigger based on status and cooldown"""
-        if self.status == RuleStatus.DISABLED:
+    async def evaluate(self, event_system):
+        """Evaluate the rule's conditions and trigger actions if met
+        
+        Args:
+            event_system (EventSystem): System for publishing events
+            
+        Returns:
+            bool: True if rule triggered, False otherwise
+            
+        Example:
+            >>> triggered = await rule.evaluate(event_system)
+            >>> if triggered:
+            ...     print("Rule activated")
+        """
+        if self.status != RuleStatus.ACTIVE:
             return False
-        if self.status == RuleStatus.COOLDOWN:
-            if (time.time() - self.last_triggered) > self.cooldown:
-                self.status = RuleStatus.ACTIVE
-            else:
-                return False
-        return True
-
-    async def evaluate(self, event_system, event_type=None):
-        """Evaluate rule conditions and execute actions if met"""
-        if not self.can_trigger():
-            return False
-
+            
         try:
-            # If event_type provided, only check conditions for that event
             conditions_met = 0
             for condition in self.conditions:
-                if event_type and condition.event_type != event_type:
-                    continue
-                    
-                # Check condition
-                try:
-                    result = await condition.check(event_system) if asyncio.iscoroutinefunction(condition.check) else condition.check()
-                    condition.last_check = time.time()
-                    condition.last_value = result
-                    if result:
-                        conditions_met += 1
-                except Exception as e:
-                    self.last_error = str(e)
-                    return False
-
-            # Determine if rule should trigger
-            should_trigger = (conditions_met == len(self.conditions) if self.require_all 
-                            else conditions_met > 0)
-
+                if condition.check():
+                    conditions_met += 1
+                    if not self.require_all:
+                        break
+                        
+            should_trigger = (conditions_met == len(self.conditions)) if self.require_all else (conditions_met > 0)
+            
             if should_trigger:
-                # Execute all actions
-                for action in self.actions:
-                    try:
-                        if asyncio.iscoroutinefunction(action):
-                            await action(event_system)
-                        else:
-                            action()
-                    except Exception as e:
-                        self.last_error = str(e)
-                        self.status = RuleStatus.FAILED
-                        return False
-
-                self.last_triggered = time.time()
-                self.trigger_count += 1
-                self.status = RuleStatus.COOLDOWN if self.cooldown > 0 else RuleStatus.ACTIVE
+                if asyncio.iscoroutinefunction(self.actions):
+                    await self.actions()
+                else:
+                    self.actions()
                 return True
-
+                    
         except Exception as e:
-            self.last_error = str(e)
-            self.status = RuleStatus.FAILED
-            return False
-
+            error(f"Rule evaluation failed for {self.name}: {e}")
+            self.status = RuleStatus.ERROR
+            
         return False
 
-    def get_state(self):
-        """Get current rule state"""
-        return {
-            "name": self.name,
-            "status": self.status,
-            "priority": self.priority,
-            "last_triggered": self.last_triggered,
-            "trigger_count": self.trigger_count,
-            "last_error": self.last_error,
-            "conditions_met": [c.last_value for c in self.conditions]
-        }
-
 class RulesEngine:
+    """Engine for managing and evaluating rules
+    
+    Manages a collection of rules, evaluating them based on
+    priority and handling rule-triggered events.
+    
+    Attributes:
+        rules (dict): Dictionary of active rules
+        event_system (EventSystem): System for handling events
+        
+    Example:
+        >>> engine = RulesEngine(event_system)
+        >>> engine.add_rule(Rule("temp_control", temp_check, fan_control))
+    """
     def __init__(self, event_system):
-        self.rules = []
-        self.events = event_system
-        self.active = True
-        self.stats = {
-            'evaluated': 0,
-            'triggered': 0,
-            'errors': 0
-        }
-
-    async def add_rule(self, rule):
-        """Add a rule and subscribe to its events"""
+        self.rules = {}
+        self.event_system = event_system
+        
+    def add_rule(self, rule):
+        """Add a rule to the engine
+        
+        Args:
+            rule (Rule): Rule to add
+            
+        Returns:
+            bool: True if added successfully, False if at limit
+            
+        Example:
+            >>> rule = Rule("door_check", door_sensor, door_alarm)
+            >>> engine.add_rule(rule)
+        """
         if len(self.rules) >= MAX_RULES:
             return False
-            
-        self.rules.append(rule)
-        # Subscribe to all events that could trigger this rule
-        for event_type in rule.event_triggers:
-            self.events.subscribe(event_type, 
-                                lambda e: self._handle_event(e, rule))
+        self.rules[rule.name] = rule
         return True
-
-    async def _handle_event(self, event, rule):
-        """Handle an event by evaluating the relevant rule"""
-        if not self.active:
-            return
+        
+    async def evaluate_all(self):
+        """Evaluate all active rules
+        
+        Evaluates rules in priority order, triggering actions
+        as needed.
+        
+        Returns:
+            int: Number of rules triggered
             
-        try:
-            self.stats['evaluated'] += 1
-            if await rule.evaluate(self.events, event.type):
-                self.stats['triggered'] += 1
-        except Exception as e:
-            self.stats['errors'] += 1
-            self.last_error = str(e)
+        Example:
+            >>> triggered = await engine.evaluate_all()
+            >>> print(f"{triggered} rules activated")
+        """
+        triggered = 0
+        # Sort rules by priority
+        sorted_rules = sorted(
+            self.rules.values(),
+            key=lambda r: r.priority,
+            reverse=True
+        )
+        
+        for rule in sorted_rules:
+            if await rule.evaluate(self.event_system):
+                triggered += 1
+                debug(f"Rule triggered: {rule.name}")
+                
+        return triggered

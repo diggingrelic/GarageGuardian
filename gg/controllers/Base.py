@@ -1,50 +1,58 @@
-import asyncio # noqa: F401
-from micropython import const # type: ignore
-
-# Base controller constants
-WATCHDOG_TIMEOUT = const(30)  # seconds
-MAX_ERROR_COUNT = const(5)    # max errors before disable
-ERROR_RESET_TIME = const(3600)  # 1 hour to reset error count
-
-class ControllerState:
-    INITIALIZING = "initializing"
-    READY = "ready"
-    RUNNING = "running"
-    ERROR = "error"
-    DISABLED = "disabled"
-    MAINTENANCE = "maintenance"
+from ..core.Events import EventSystem
+from ..hardware.interfaces.Base import BaseDevice
+from ..logging.Log import error
+import time
 
 class BaseController:
-    """Base controller class with common functionality"""
+    """Base controller for all device controllers
     
-    def __init__(self, name: str, hardware=None, safety_monitor=None, event_system=None):
-        self.name = name
-        self.hardware = hardware
-        self.safety = safety_monitor
+    Provides common functionality for device monitoring,
+    event publishing, and error handling.
+    """
+    
+    def __init__(self, device: BaseDevice, event_system: EventSystem):
+        self.device = device
         self.events = event_system
-        self.enabled = True
+        self._last_check = 0.0
+        self._check_interval = 1.0  # seconds
         
-    async def initialize(self):
-        """Initialize the controller"""
-        if self.safety:
-            self._setup_safety_conditions()
-        if self.events:
-            self._setup_event_handlers()
-        return True
+    async def publish_event(self, event_type: str, data: dict = None):
+        """Publish an event with standard metadata
         
-    def _setup_safety_conditions(self):
-        """Setup safety conditions - override in subclasses"""
-        pass
+        Args:
+            event_type (str): Type of event to publish
+            data (dict, optional): Event specific data
+        """
+        if data is None:
+            data = {}
+            
+        data.update({
+            "timestamp": time.time(),
+            "device_working": self.device.is_working()
+        })
         
-    def _setup_event_handlers(self):
-        """Setup event handlers - override in subclasses"""
-        pass
+        await self.events.publish(event_type, data)
         
-    async def update(self):
-        """Update controller state - override in subclasses"""
-        pass
+    async def publish_error(self, error_msg: str):
+        """Publish a device error event
         
-    def cleanup(self):
-        """Cleanup resources"""
-        if hasattr(self.hardware, 'cleanup'):
-            self.hardware.cleanup()
+        Args:
+            error_msg (str): Error message to publish
+        """
+        error(f"{self.__class__.__name__}: {error_msg}")
+        await self.publish_event(f"{self.device_type}_error", {
+            "error": error_msg
+        })
+        
+    @property
+    def device_type(self) -> str:
+        """Get the type of device this controls"""
+        return self.__class__.__name__.lower().replace('controller', '')
+        
+    def should_check(self) -> bool:
+        """Check if enough time has passed for next device check"""
+        now = time.time()
+        if now - self._last_check >= self._check_interval:
+            self._last_check = now
+            return True
+        return False
