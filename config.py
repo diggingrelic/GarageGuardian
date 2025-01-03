@@ -25,6 +25,7 @@ class PinConfig:
 
 class LogConfig:
     DEBUG = True  # Set to False in production
+    LOG_LEVEL = "DEBUG"  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
     RUN_TESTS = True
     TEST_DELAY = 2  # Seconds to wait after test failures
 

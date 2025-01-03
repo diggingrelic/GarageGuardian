@@ -56,7 +56,7 @@ class TestEvents(TestCase):
         stats = self.events.get_stats()
         self.assertTrue('processed' in stats)
         self.assertTrue('dropped' in stats)
-        self.assertTrue('errors' in stats) 
+        self.assertTrue('errors' in stats)
 
     async def test_state_transitions(self):
         """Test system state transitions"""
@@ -70,4 +70,4 @@ class TestEvents(TestCase):
         
         # Test another state change
         await self.events.publish("system_state", {"state": "running"})
-        self.assertEqual(self.test_data[1]["state"], "running") 
+        self.assertEqual(self.test_data[1]["state"], "running")

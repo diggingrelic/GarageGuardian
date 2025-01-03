@@ -6,7 +6,7 @@ from .core.Rules import RulesEngine
 import time
 import gc
 from config import PinConfig
-from .logging.Log import log
+from gg.logging.Log import debug, info, warning, error, critical
 
 class SystemState:
     INITIALIZING = "initializing"
@@ -26,7 +26,7 @@ class IoTController:
         self.rules = RulesEngine(self.events)  # Add Rules Engine
         
     async def initialize(self):
-        print("Initializing...")
+        info("Initializing...")
         # Subscribe to system events
         self.events.subscribe("system_state", self._handle_state_change)
         self.events.subscribe("system_error", self._handle_error)
@@ -49,7 +49,7 @@ class IoTController:
         pass  # Default rules can be added by subclassing
 
     async def run(self):
-        print("Running...")
+        info("Running...")
         self.state = SystemState.RUNNING
         
         # Publish state change
@@ -69,10 +69,10 @@ class IoTController:
             })
             await asyncio.sleep(1)
 
-    def _log_error(self, error, level="ERROR"):
+    def _log_error(self, log_error, level="ERROR"):
         """Log an error and publish error event"""
         error_data = {
-            "message": str(error),
+            "message": str(log_error),
             "level": level,
             "timestamp": time.time()
         }
@@ -82,12 +82,12 @@ class IoTController:
 
     async def _handle_state_change(self, event):
         """Handle system state change events"""
-        print(f"System state changed: {event.data['state']}")
+        info(f"System state changed: {event.data['state']}")
         # Add any state transition logic here
 
     async def _handle_error(self, event):
         """Handle system error events"""
-        print(f"System error: {event.data['message']} (Level: {event.data['level']})")
+        error(f"System error: {event.data['message']} (Level: {event.data['level']})")
 
     async def _handle_heartbeat(self, event):
         """Handle system heartbeat events"""
@@ -106,7 +106,7 @@ class IoTController:
 
     async def shutdown(self):
         """Perform a clean shutdown"""
-        print("Shutting down...")
+        info("Shutting down...")
         self.state = SystemState.SHUTDOWN
         await self.events.publish("system_state", {
             "state": self.state,
