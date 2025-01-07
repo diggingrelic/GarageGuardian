@@ -34,7 +34,7 @@ class TestIoTController(TestCase):
     async def test_initialization(self):
         """Test system initialization"""
         self.assertEqual(self.controller.state, SystemState.INITIALIZING)
-        result = await self.controller.initialize_system()
+        result = await self.controller.initialize()
         self.assertTrue(result)
         self.assertEqual(self.controller.state, SystemState.RUNNING)
         

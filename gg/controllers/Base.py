@@ -22,19 +22,36 @@ class BaseController:
         self.enabled = True
         
     async def initialize(self):
-        """Initialize the controller
-        
-        Returns:
-            bool: True if initialization successful
-        """
-        await self.events.start()  # Ensure events system is started
-        await self.safety.start()  # Ensure safety system is started
+        """Initialize the controller"""
+        await self.events.start()
+        await self.safety.start()
         return True
         
-    async def update(self):
-        """Update controller state"""
+    async def monitor(self):
+        """Monitor device state - must be implemented by subclasses"""
         pass
         
-    def cleanup(self):
+    async def cleanup(self):
         """Clean up controller resources"""
         self.enabled = False
+        await self.events.publish("controller_disabled", {
+            "name": self.name,
+            "timestamp": time.time()
+        })
+        
+    async def publish_error(self, message: str):
+        """Publish an error event"""
+        error(f"{self.name}: {message}")
+        await self.events.publish("controller_error", {
+            "controller": self.name,
+            "error": message,
+            "timestamp": time.time()
+        })
+        
+    async def publish_event(self, event_type: str, data: dict):
+        """Publish an event through the event system"""
+        event_data = data.copy()
+        event_data["controller"] = self.name
+        if "timestamp" not in event_data:
+            event_data["timestamp"] = time.time()
+        await self.events.publish(event_type, event_data)

@@ -1,4 +1,5 @@
 # Core systems
+'''
 from .IoTController import IoTController
 from .core.Events import EventSystem
 from . import testing
@@ -10,3 +11,4 @@ __all__ = [
     'EventSystem',
     'testing'
 ]
+'''
