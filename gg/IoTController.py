@@ -7,9 +7,8 @@ from .controllers.Thermostat import ThermostatController
 from .devices.HeaterRelay import HeaterRelay
 from .devices.TempSensorADT7410 import TempSensorADT7410
 from .config import PinConfig, I2CConfig
-from machine import I2C, Pin
+from machine import I2C, Pin # type: ignore
 from .logging.Log import info, error, critical
-import asyncio
 import time
 
 class SystemState:

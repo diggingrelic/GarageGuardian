@@ -2,6 +2,7 @@ import time
 import asyncio
 from config import LogConfig
 from gg.logging.Log import debug, info, warning, error, critical
+from gg.debug_interface import DebugInterface
 
 # Development mode identifier
 debug("=" * 40)
@@ -109,3 +110,8 @@ finally:
     info("System stopped. Use Thonny's Stop/Restart")
     info("to return to development mode.")
     info("="*40 + "\n")
+
+# After tests
+if __name__ == "__main__":
+    interface = DebugInterface()
+    asyncio.run(interface.start())
