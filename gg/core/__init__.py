@@ -1,1 +1,1 @@
-# Empty __init__.py to mark directory as Python package
+# Empty init file to mark as package

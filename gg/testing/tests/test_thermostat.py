@@ -1,11 +1,25 @@
 from ..microtest import TestCase
-from ...controllers.Thermostat import ThermostatController
 from ...core.Events import EventSystem
 from ...core.Safety import SafetyMonitor
-from ..mocks.MockRelay import MockRelay
-from ...config import SystemConfig
+from ...controllers.Thermostat import ThermostatController
+from ...devices.HeaterRelay import HeaterRelay
+from config import SystemConfig
 import gc
 import time
+
+class MockRelay(HeaterRelay):
+    """Mock relay for testing"""
+    def __init__(self):
+        self.active = False
+        
+    async def activate(self):
+        self.active = True
+        
+    async def deactivate(self):
+        self.active = False
+        
+    async def is_active(self):
+        return self.active
 
 class TestThermostatController(TestCase):
     def setUp(self):
@@ -91,4 +105,83 @@ class TestThermostatController(TestCase):
         # Wait for cycle delay
         time.sleep(SystemConfig.TEMP_SETTINGS['CYCLE_DELAY'])
         await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
-        self.assertTrue(await self.hardware.is_active()) 
+        self.assertTrue(await self.hardware.is_active())
+        
+    async def test_heater_enable_disable(self):
+        """Test heater enable/disable functionality"""
+        await self.controller.initialize()
+        await self.controller.set_temperature(72.0)
+        
+        # Initially disabled
+        self.assertFalse(self.controller.heater_enabled)
+        
+        # Simulate cold temperature - should not turn on when disabled
+        await self.controller.handle_temperature({
+            "temp": 70.0,
+            "timestamp": time.time()
+        })
+        self.assertFalse(await self.hardware.is_active())
+        
+        # Enable heater
+        await self.controller.enable_heater()
+        self.assertTrue(self.controller.heater_enabled)
+        
+        # Now should respond to temperature
+        await self.controller.handle_temperature({
+            "temp": 70.0,
+            "timestamp": time.time()
+        })
+        self.assertTrue(await self.hardware.is_active())
+        
+        # Disable heater
+        await self.controller.disable_heater()
+        self.assertFalse(self.controller.heater_enabled)
+        self.assertFalse(await self.hardware.is_active())
+        
+    async def test_cycle_delay_after_disable(self):
+        """Test cycle delay is enforced after disable/enable"""
+        await self.controller.initialize()
+        await self.controller.set_temperature(72.0)
+        await self.controller.enable_heater()
+        
+        # Turn on then disable
+        await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
+        self.assertTrue(await self.hardware.is_active())
+        
+        await self.controller.disable_heater()
+        self.assertFalse(await self.hardware.is_active())
+        
+        # Enable before cycle delay expires
+        await self.controller.enable_heater()
+        await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
+        self.assertFalse(await self.hardware.is_active())  # Should respect cycle delay
+        
+        # Wait for cycle delay
+        time.sleep(SystemConfig.TEMP_SETTINGS['CYCLE_DELAY'])
+        await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
+        self.assertTrue(await self.hardware.is_active())
+        
+    async def test_min_run_time_with_disable(self):
+        """Test minimum run time is enforced even when disabling"""
+        await self.controller.initialize()
+        await self.controller.set_temperature(72.0)
+        await self.controller.enable_heater()
+        
+        # Turn on heater
+        await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
+        start_time = time.time()
+        self.assertTrue(await self.hardware.is_active())
+        
+        # Try to disable before minimum run time
+        await self.controller.disable_heater()
+        self.assertFalse(self.controller.heater_enabled)
+        self.assertTrue(await self.hardware.is_active())  # Should stay on until min run time
+        
+        # Wait for minimum run time
+        remaining_time = (start_time + SystemConfig.TEMP_SETTINGS['MIN_RUN_TIME']) - time.time()
+        if remaining_time > 0:
+            time.sleep(remaining_time)
+            
+        # Now should turn off
+        await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
+        self.assertFalse(await self.hardware.is_active()) 

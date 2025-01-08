@@ -33,54 +33,20 @@ class EventSystem:
     """Simple event system for MicroPython"""
     
     def __init__(self):
-        self.subscribers = {}  # event_type -> list of handlers
-        self.stats = {
-            "published": 0,
-            "handled": 0,
-            "errors": 0
-        }
+        self.subscribers = {}
         
     async def start(self):
         """Initialize the event system"""
-        self.subscribers = {}
         return True
         
-    async def stop(self):
-        """Clean shutdown of event system"""
-        self.subscribers = {}
-        return True
-        
-    def subscribe(self, event_type: str, handler) -> bool:
-        """Subscribe to an event type
-        
-        Args:
-            event_type: Type of event to subscribe to
-            handler: Async function to handle event
-        Returns:
-            bool: True if subscription successful
-        """
+    def subscribe(self, event_type, handler):
+        """Subscribe to an event type"""
         if event_type not in self.subscribers:
             self.subscribers[event_type] = []
-            
-        if len(self.subscribers[event_type]) >= MAX_SUBSCRIBERS:
-            return False
-            
         self.subscribers[event_type].append(handler)
-        return True
         
-    async def publish(self, event_type: str, data=None):
-        """Publish an event
-        
-        Args:
-            event_type: Type of event to publish
-            data: Optional data to pass to handlers
-        """
-        self.stats["published"] += 1
-        
+    async def publish(self, event_type, data=None):
+        """Publish an event"""
         if event_type in self.subscribers:
             for handler in self.subscribers[event_type]:
-                try:
-                    await handler({"type": event_type, "data": data})
-                    self.stats["handled"] += 1
-                except Exception:
-                    self.stats["errors"] += 1
+                await handler(data)

@@ -3,6 +3,8 @@ from ...IoTController import IoTController, SystemState
 from ...core.Events import EventSystem
 from ...controllers.Base import BaseController
 from ...interfaces.Base import BaseDevice
+from ...core.DeviceFactory import DeviceFactory
+from ...core.Safety import SafetyMonitor
 import gc
 
 class MockDevice(BaseDevice):
@@ -25,16 +27,23 @@ class MockController(BaseController):
 
 class TestIoTController(TestCase):
     def setUp(self):
-        self.controller = IoTController()
+        self.events = EventSystem()
+        self.safety = SafetyMonitor()
+        self.device_factory = DeviceFactory()
+        self.controller = IoTController(
+            event_system=self.events,
+            safety_monitor=self.safety
+        )
         
     def tearDown(self):
         self.controller = None
+        self.device_factory = None
         gc.collect()
         
     async def test_initialization(self):
         """Test system initialization"""
         self.assertEqual(self.controller.state, SystemState.INITIALIZING)
-        result = await self.controller.initialize()
+        result = await self.controller.initialize(device_factory=self.device_factory)
         self.assertTrue(result)
         self.assertEqual(self.controller.state, SystemState.RUNNING)
         

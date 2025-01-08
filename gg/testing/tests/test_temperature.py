@@ -1,11 +1,21 @@
 from ..microtest import TestCase
-from ...controllers.Temperature import TemperatureController
 from ...core.Events import EventSystem
 from ...core.Safety import SafetyMonitor
-from ..mocks.MockTemperature import MockTemperature
-from ...config import SystemConfig
+from ...controllers.Temperature import TemperatureController
+from ...interfaces.Temperature import TemperatureDevice
+from config import SystemConfig
 import gc
-import time
+
+class MockTemperature(TemperatureDevice):
+    """Mock temperature sensor for testing"""
+    def __init__(self, temp=72.0):
+        self._temp = temp
+        
+    def get_fahrenheit(self):
+        return self._temp
+        
+    def get_celsius(self):
+        return (self._temp - 32) * 5/9
 
 class TestTemperatureController(TestCase):
     def setUp(self):

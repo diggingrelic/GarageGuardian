@@ -2,14 +2,15 @@ from .core.Events import EventSystem
 from .core.Rules import RulesEngine
 from .core.Safety import SafetyMonitor
 from .controllers.Base import BaseController
-from .controllers.Temperature import TemperatureController
-from .controllers.Thermostat import ThermostatController
-from .devices.HeaterRelay import HeaterRelay
-from .devices.TempSensorADT7410 import TempSensorADT7410
-from .config import PinConfig, I2CConfig
+#from .controllers.Temperature import TemperatureController
+#from .controllers.Thermostat import ThermostatController
+#from .devices.HeaterRelay import HeaterRelay
+#from .devices.TempSensorADT7410 import TempSensorADT7410
+#from config import PinConfig, I2CConfig
 from machine import I2C, Pin # type: ignore
-from .logging.Log import info, error, critical
+from .logging.Log import info, error, critical, debug
 import time
+import asyncio
 
 class SystemState:
     """System state enumeration"""
@@ -32,13 +33,12 @@ class IoTController:
         await controller.start()
     """
     
-    def __init__(self):
-        self.events = EventSystem()
-        self.rules = RulesEngine(self.events)
-        self.safety = SafetyMonitor()
-        self.devices = {}  # type: dict[str, BaseController]
+    def __init__(self, event_system=None, safety_monitor=None):
+        self.events = event_system or EventSystem()
+        self.safety = safety_monitor or SafetyMonitor()
+        self.rules = RulesEngine(self.events)  # Initialize rules
+        self.devices = {}
         self.state = SystemState.INITIALIZING
-        self._monitoring = False
         
     def register_device(self, name: str, device: BaseController) -> bool:
         """Register a device controller
@@ -58,72 +58,30 @@ class IoTController:
         info(f"Device {name} registered")
         return True
         
-    async def initialize(self):
+    async def initialize(self, device_factory=None):
         """Initialize the IoT controller system"""
         info("Starting IoT controller")
         self.state = SystemState.INITIALIZING
         
         try:
-            # Initialize each subsystem
+            # Initialize core systems
             if not await self.events.start():
                 return False
             if not await self.safety.start():
                 return False
             if not await self.rules.start():
                 return False
-                
-            # Subscribe to system events
-            self.events.subscribe("controller_error", self._handle_error)
-            self.events.subscribe("controller_disabled", self._handle_controller_disabled)
-            
-            # Temperature events
-            self.events.subscribe("temperature_current", self._handle_temperature)
-            self.events.subscribe("temperature_changed", self._handle_temperature_change)
-            
-            # Thermostat events
-            self.events.subscribe("heater_on", self._handle_heater_on)
-            self.events.subscribe("heater_off", self._handle_heater_off)
-            self.events.subscribe("setpoint_changed", self._handle_setpoint_change)
-            
-            # Safety events
-            self.events.subscribe("safety_alert", self._handle_safety_alert)
-            self.events.subscribe("safety_cleared", self._handle_safety_cleared)
-            
-            # Initialize I2C for temperature sensor
-            i2c = I2C(0, 
-                     scl=Pin(PinConfig.I2C_SCL), 
-                     sda=Pin(PinConfig.I2C_SDA),
-                     freq=I2CConfig.FREQUENCY)
-                     
-            # Initialize temperature control
-            temp_sensor = TempSensorADT7410(i2c)
-            heater_relay = HeaterRelay()
-            
-            temp_controller = TemperatureController(
-                "temperature",
-                temp_sensor,
-                self.safety,
-                self.events
-            )
-            
-            thermostat = ThermostatController(
-                "thermostat",
-                heater_relay,
-                self.safety,
-                self.events
-            )
-            
-            # Register controllers
-            self.register_device("temperature", temp_controller)
-            self.register_device("thermostat", thermostat)
-            
-            # Initialize all devices
-            for name, device in self.devices.items():
-                if not await device.initialize():
-                    error(f"Failed to initialize {name}")
+
+            if device_factory:
+                # Let factory create and register devices
+                if not await device_factory.create_devices(self):
                     return False
-            
-            self._monitoring = True
+                    
+            # Start monitoring loop for temperature
+            temp_controller = self.get_device("temperature")
+            if temp_controller:
+                asyncio.create_task(self._monitor_temperature(temp_controller))
+                
             self.state = SystemState.RUNNING
             return True
             
@@ -131,6 +89,12 @@ class IoTController:
             critical(f"Initialization failed: {e}")
             self.state = SystemState.ERROR
             return False
+            
+    async def _monitor_temperature(self, temp_controller):
+        """Background task to monitor temperature"""
+        while self.state == SystemState.RUNNING:
+            await temp_controller.monitor()
+            await asyncio.sleep_ms(100)  # Small delay between checks
         
     async def run(self):
         """Run one monitoring cycle"""

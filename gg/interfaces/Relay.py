@@ -1,16 +1,16 @@
-from .Base import BaseDevice
+from .Device import Device
 
-class RelayDevice(BaseDevice):
-    """Interface for relay hardware control"""
+class RelayDevice(Device):
+    """Interface for relay devices"""
     
     async def activate(self):
-        """Activate/turn on the relay"""
+        """Activate the relay"""
         raise NotImplementedError
         
     async def deactivate(self):
-        """Deactivate/turn off the relay"""
+        """Deactivate the relay"""
         raise NotImplementedError
         
     async def is_active(self):
-        """Check if relay is currently activated"""
+        """Check if relay is active"""
         raise NotImplementedError 

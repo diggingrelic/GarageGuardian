@@ -3,6 +3,10 @@ import asyncio
 from config import LogConfig
 from gg.logging.Log import debug, info, warning, error, critical
 from gg.debug_interface import DebugInterface
+from gg.IoTController import IoTController
+from gg.core.DeviceFactory import DeviceFactory
+from gg.core.Events import EventSystem
+from gg.core.Safety import SafetyMonitor
 
 # Development mode identifier
 debug("=" * 40)
@@ -22,19 +26,21 @@ if LogConfig.RUN_TESTS:
         time.sleep(LogConfig.TEST_DELAY)
     debug("=" * 40)
 
-# Start normal operation
-try:
-    from gg.IoTController import IoTController
-except Exception as e:
-    error(f"Import error: {e}")
-    raise
-
 class GarageOS:
     def __init__(self):
         self.name = "GarageOS"
         self.version = "1.0.0"
         try:
-            self.controller = IoTController()
+            # Create core systems
+            self.events = EventSystem()
+            self.safety = SafetyMonitor()
+            self.device_factory = DeviceFactory()
+            
+            # Initialize controller with dependencies
+            self.controller = IoTController(
+                event_system=self.events,
+                safety_monitor=self.safety
+            )
         except Exception as e:
             error(f"Controller init error: {e}")
             raise
@@ -46,7 +52,7 @@ class GarageOS:
         info("Initializing system components...")
         
         try:
-            if await self.controller.initialize():
+            if await self.controller.initialize(device_factory=self.device_factory):
                 info("System initialization successful")
                 return True
             else:
@@ -81,7 +87,6 @@ class GarageOS:
         except Exception as e:
             error(f"Shutdown error: {e}")
 
-# Main execution
 async def main():
     info("Initializing GarageOS...")
     try:
@@ -89,7 +94,15 @@ async def main():
         
         if await system.startup():
             info("System ready, starting main loop")
-            await system.run()
+            # Create debug interface with existing system controller
+            interface = DebugInterface(system.controller)
+            
+            # Create tasks for both system and debug interface
+            system_task = asyncio.create_task(system.run())
+            interface_task = asyncio.create_task(interface.start())
+            
+            # Wait for either task to complete
+            await asyncio.gather(system_task, interface_task)
         else:
             info("System startup failed")
             await system.safe_shutdown()
@@ -110,8 +123,3 @@ finally:
     info("System stopped. Use Thonny's Stop/Restart")
     info("to return to development mode.")
     info("="*40 + "\n")
-
-# After tests
-if __name__ == "__main__":
-    interface = DebugInterface()
-    asyncio.run(interface.start())

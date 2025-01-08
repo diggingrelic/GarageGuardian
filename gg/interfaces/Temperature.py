@@ -1,12 +1,12 @@
-from .Base import BaseDevice
+from .Device import Device
 
-class TemperatureDevice(BaseDevice):
-    """Interface for temperature sensor hardware"""
+class TemperatureDevice(Device):
+    """Interface for temperature sensors"""
     
-    def read(self):
-        """Read current temperature and humidity
+    def get_fahrenheit(self):
+        """Get temperature in Fahrenheit"""
+        raise NotImplementedError
         
-        Returns:
-            tuple: (temperature in C, humidity percentage)
-        """
+    def get_celsius(self):
+        """Get temperature in Celsius"""
         raise NotImplementedError 

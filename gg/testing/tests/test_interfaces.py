@@ -57,7 +57,8 @@ class TestTemperatureInterface(TestCase):
     def test_required_methods(self):
         """Verify required methods"""
         required_methods = [
-            'read',
+            'get_fahrenheit',
+            'get_celsius',
             'is_working'
         ]
         

@@ -57,76 +57,29 @@ class SafetyMonitor:
     """
     
     def __init__(self):
-        self.conditions = {}  # name -> SafetyCondition
-        self._active = False
-        self.status = SafetyStatus.NORMAL
-        self._emergency_stop = None
+        self.conditions = {}
         
     async def start(self):
-        """Initialize the safety system"""
-        self._active = True
+        """Initialize the safety monitor"""
         return True
         
-    async def stop(self):
-        """Clean shutdown of safety system"""
-        self._active = False
-        return True
-        
-    def add_condition(self, name, check_func, severity=SAFETY_MEDIUM, recovery_action=None):
-        """Add a safety condition to monitor
-        
-        Args:
-            name: Unique name for the condition
-            check_func: Function that returns bool (True = safe)
-            severity: Safety level (SAFETY_LOW to SAFETY_CRITICAL)
-            recovery_action: Optional function to call when unsafe
-        """
-        condition = SafetyCondition(name, check_func, severity, recovery_action)
-        self.conditions[name] = condition
+    def add_condition(self, name, check_func):
+        """Add a safety condition to monitor"""
+        self.conditions[name] = check_func
         
     async def check_safety(self):
-        """Check all safety conditions
-        
-        Returns:
-            bool: True if all conditions are safe
-        """
-        if not self._active:
-            return False
-            
-        all_safe = True
-        for condition in self.conditions.values():
+        """Check all safety conditions"""
+        results = {}
+        for name, check in self.conditions.items():
             try:
-                if not condition.check_func():
-                    all_safe = False
-                    condition.status = SafetyStatus.FAILURE
-                    if condition.recovery_action:
-                        condition.recovery_action()
-                else:
-                    condition.status = SafetyStatus.NORMAL
-            except Exception:
-                all_safe = False
-                condition.status = SafetyStatus.FAILURE
-                
-        return all_safe
+                results[name] = await check()
+            except Exception as e:
+                results[name] = False
+        return all(results.values())
         
-    def register_emergency_stop(self, stop_func):
-        """Register emergency stop callback"""
-        self._emergency_stop = stop_func
-        
-    async def emergency_stop(self):
-        """Trigger emergency stop"""
-        if self._emergency_stop:
-            await self._emergency_stop()
-        self.status = SafetyStatus.FAILURE
-        
-    def get_status(self):
-        """Get current safety status
-        
-        Returns:
-            dict: Current safety system status
-        """
-        return {
-            "active": self._active,
-            "status": self.status,
-            "conditions": {name: cond.status for name, cond in self.conditions.items()}
-        }
+    async def check_all(self):
+        """Check all safety conditions and return detailed results"""
+        results = {}
+        for name, check in self.conditions.items():
+            results[name] = await check()
+        return results
