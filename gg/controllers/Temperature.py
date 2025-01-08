@@ -1,6 +1,6 @@
 from .Base import BaseController
+from gg.logging.Log import debug, error
 from config import SystemConfig
-from ..logging.Log import info, debug, error
 import time
 
 class TemperatureController(BaseController):
@@ -19,31 +19,18 @@ class TemperatureController(BaseController):
             error("Temperature sensor initialization failed")
             return False
             
-        # Get initial temperature reading
-        try:
-            current_temp = self.hardware.get_fahrenheit()
-            if current_temp is not None:
-                self._last_temp = current_temp
-                self._last_check = time.time()
-                debug(f"Initial temperature reading: {current_temp}°F")
-                
-                # Publish initial temperature
-                await self.publish_event("temperature_current", {
-                    "temp": current_temp,
-                    "timestamp": time.time()
-                })
-                return True
-            else:
-                error("Failed to get initial temperature reading")
-                return False
-                
-        except Exception as e:
-            error(f"Error getting initial temperature: {e}")
-            return False
-            
+        # Use the reading we already have
+        self._last_temp = self.hardware.get_fahrenheit()
+        self._last_check = time.time()
+        
+        # Publish initial temperature
+        await self.publish_event("temperature_current", {
+            "temp": self._last_temp,
+            "timestamp": self._last_check
+        })
         debug(f"Temperature controller initialized, enabled={self.enabled}")
         return True
-        
+            
     async def monitor(self):
         """Monitor temperature and publish changes"""
         if not self.enabled:

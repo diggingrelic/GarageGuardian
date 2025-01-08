@@ -2,12 +2,6 @@ from .core.Events import EventSystem
 from .core.Rules import RulesEngine
 from .core.Safety import SafetyMonitor
 from .controllers.Base import BaseController
-#from .controllers.Temperature import TemperatureController
-#from .controllers.Thermostat import ThermostatController
-#from .devices.HeaterRelay import HeaterRelay
-#from .devices.TempSensorADT7410 import TempSensorADT7410
-#from config import PinConfig, I2CConfig
-from machine import I2C, Pin # type: ignore
 from .logging.Log import info, error, critical, debug
 import time
 import asyncio
@@ -39,6 +33,7 @@ class IoTController:
         self.rules = RulesEngine(self.events)  # Initialize rules
         self.devices = {}
         self.state = SystemState.INITIALIZING
+        self._monitoring = False  # Initialize monitoring flag here
         
     def register_device(self, name: str, device: BaseController) -> bool:
         """Register a device controller
@@ -80,6 +75,7 @@ class IoTController:
             # Start monitoring loop for temperature
             temp_controller = self.get_device("temperature")
             if temp_controller:
+                self._monitoring = True
                 asyncio.create_task(self._monitor_temperature(temp_controller))
                 
             self.state = SystemState.RUNNING

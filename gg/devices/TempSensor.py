@@ -15,19 +15,7 @@ class TempSensorADT7410(TemperatureDevice):
         self._read_interval = 0.1  # 100ms minimum between reads
         
     def get_fahrenheit(self):
-        """Get temperature in Fahrenheit"""
-        try:
-            c = self.get_celsius()
-            if c is None:
-                error("Failed to get Celsius reading")
-                raise ValueError("Temperature reading failed")
-            return (c * 9/5) + 32
-        except Exception as e:
-            error(f"Temperature conversion failed: {e}")
-            raise  # Re-raise to ensure errors are caught
-            
-    def get_celsius(self):
-        """Get temperature in Celsius"""
+        """Get temperature in Fahrenheit directly from sensor"""
         current_time = time.time()
         if current_time - self._last_read < self._read_interval:
             return None
@@ -38,7 +26,8 @@ class TempSensorADT7410(TemperatureDevice):
             temp = (data[0] << 8 | data[1]) >> 3
             if temp & 0x1000:
                 temp = temp - 8192
-            return temp * 0.0625
+            # Convert directly to Fahrenheit
+            return (temp * 0.0625 * 9/5) + 32
         except Exception as e:
             error(f"Temperature read failed: {e}")
             return None

@@ -35,6 +35,7 @@ class DebugInterface:
         print("Commands:")
         print("  temp - Show current temperature")
         print("  set <temp> - Set thermostat (e.g. 'set 72')")
+        print("  delay <seconds> - Set cycle delay")
         print("  heat on/off - Force heater state")
         print("  status - Show system status")
         print("  quit - Exit")
@@ -83,6 +84,32 @@ class DebugInterface:
                     print(f"Current temperature: {temp}°F")
                 else:
                     print("Temperature controller not found!")
+            elif cmd.startswith("set "):
+                try:
+                    temp = float(cmd.split()[1])
+                    thermostat = self.controller.get_device("thermostat")
+                    if thermostat:
+                        if await thermostat.set_temperature(temp):
+                            print(f"Setpoint set to {temp}°F")
+                        else:
+                            print("Failed to set temperature")
+                    else:
+                        print("Thermostat controller not found!")
+                except (ValueError, IndexError):
+                    print("Invalid temperature - use 'set <temp>'")
+            elif cmd.startswith("delay "):
+                try:
+                    delay = int(cmd.split()[1])
+                    thermostat = self.controller.get_device("thermostat")
+                    if thermostat:
+                        if await thermostat.set_cycle_delay(delay):
+                            print(f"Cycle delay set to {delay} seconds")
+                        else:
+                            print("Failed to set cycle delay")
+                    else:
+                        print("Thermostat controller not found!")
+                except (ValueError, IndexError):
+                    print("Invalid delay - use 'delay <seconds>'")
             elif cmd.startswith("heat "):
                 state = cmd.split()[1]
                 thermostat = self.controller.get_device("thermostat")

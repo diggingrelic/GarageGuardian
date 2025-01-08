@@ -36,7 +36,12 @@ class EventSystem:
         self.subscribers = {}
         
     async def start(self):
-        """Initialize the event system"""
+        """Initialize event system"""
+        return True
+        
+    async def stop(self):
+        """Stop event system"""
+        self.subscribers.clear()
         return True
         
     def subscribe(self, event_type, handler):

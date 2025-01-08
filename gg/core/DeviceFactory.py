@@ -22,20 +22,26 @@ class DeviceFactory:
             temp_sensor = TempSensorADT7410(self.i2c)
             heater_relay = HeaterRelay()
             
-            # Create controllers
+            # Create and initialize controllers
             temp_controller = TemperatureController(
                 "temperature",
                 temp_sensor,
                 controller.safety,
                 controller.events
             )
-            
+            if not await temp_controller.initialize():
+                error("Failed to initialize temperature controller")
+                return False
+                
             thermostat = ThermostatController(
                 "thermostat",
                 heater_relay,
                 controller.safety,
                 controller.events
             )
+            if not await thermostat.initialize():
+                error("Failed to initialize thermostat")
+                return False
             
             # Register with controller
             controller.register_device("temperature", temp_controller)

@@ -83,3 +83,7 @@ class SafetyMonitor:
         for name, check in self.conditions.items():
             results[name] = await check()
         return results
+
+    async def stop(self):
+        """Stop the safety monitor"""
+        return True

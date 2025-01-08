@@ -19,18 +19,17 @@ class ThermostatController(BaseController):
         self.heater_enabled = False
         self._pending_disable = False
         
-    async def initialize(self):
-        """Initialize the thermostat"""
         debug("=== Initializing Thermostat ===")
-        await super().initialize()
-        
         debug("Subscribing to temperature events")
-        debug(f"Events system has {self.events.subscribers}")  # Debug subscribers
+        debug(f"Events system has {self.events.subscribers}")
         self.events.subscribe("temperature_current", self.handle_temperature)
-        debug(f"After subscribe: {self.events.subscribers}")  # Verify subscription
+        debug(f"After subscribe: {self.events.subscribers}")
         
+    async def initialize(self):
+        """Initialize the thermostat hardware"""
+        await super().initialize()
         await self.hardware.deactivate()
-        debug("Thermostat initialized")
+        debug("Thermostat hardware initialized")
         return True
         
     async def handle_temperature(self, data):
@@ -103,7 +102,7 @@ class ThermostatController(BaseController):
             if await self.hardware.is_active():
                 # Check minimum run time
                 if current_time - self._last_on_time < self._min_run_time:
-                    debug("Minimum run time not met")
+                    #debug("Minimum run time not met")
                     return
                     
                 # Turn off if above setpoint + differential
@@ -171,3 +170,41 @@ class ThermostatController(BaseController):
             await self.hardware.deactivate()
         except Exception as e:
             await self.publish_error(f"Cleanup failed: {e}") 
+        
+    async def set_temperature(self, setpoint):
+        """Set the target temperature"""
+        try:
+            if setpoint < SystemConfig.TEMP_SETTINGS['MIN_TEMP'] or \
+               setpoint > SystemConfig.TEMP_SETTINGS['MAX_TEMP']:
+                return False
+                
+            self.setpoint = setpoint
+            await self.publish_event("thermostat_setpoint", {
+                "setpoint": setpoint,
+                "timestamp": time.time()
+            })
+            debug(f"Setpoint changed to {setpoint}°F")
+            return True
+            
+        except Exception as e:
+            error(f"Failed to set temperature: {e}")
+            return False 
+        
+    async def set_cycle_delay(self, delay):
+        """Set the cycle delay"""
+        try:
+            if delay < 0:
+                return False
+                
+            SystemConfig.TEMP_SETTINGS['CYCLE_DELAY'] = delay
+            self._cycle_delay = delay
+            await self.publish_event("thermostat_cycle_delay", {
+                "delay": delay,
+                "timestamp": time.time()
+            })
+            debug(f"Cycle delay changed to {delay}s")
+            return True
+            
+        except Exception as e:
+            error(f"Failed to set cycle delay: {e}")
+            return False 
