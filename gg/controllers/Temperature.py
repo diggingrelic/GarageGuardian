@@ -43,7 +43,6 @@ class TemperatureController(BaseController):
         try:
             current_temp = self.hardware.get_fahrenheit()  # This will raise if reading fails
             self._last_check = current_time
-            debug(f"Publishing temperature_current event: {current_temp}°F")
                 
             # Always publish current reading
             await self.publish_event("temperature_current", {
