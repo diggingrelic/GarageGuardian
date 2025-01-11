@@ -24,7 +24,7 @@ async def run_tests(controller):
         except Exception as e:
             error(f"Teardown failed: {e}")
             
-    debug(f"\nResults: {passed} passed, {failed} failed")
+    debug(f"Results: {passed} passed, {failed} failed")
     return passed, failed
 
 def main():
@@ -32,9 +32,9 @@ def main():
     try:
         asyncio.run(run_tests())
     except KeyboardInterrupt:
-        print("\nTests cancelled by user")
+        debug("Tests cancelled by user")
     except Exception as e:
-        print(f"Error: {e}")
+        error(f"Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

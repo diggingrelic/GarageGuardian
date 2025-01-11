@@ -79,7 +79,7 @@ class DebugInterface:
         """Handle a debug command"""
         try:
             cmd = cmd.strip().lower()
-            debug(f"\nProcessing command: {cmd}")
+            debug(f"Processing command: {cmd}")
 
             if cmd == "quit":
                 self.running = False
@@ -108,12 +108,7 @@ class DebugInterface:
             elif cmd.startswith("delay "):
                 try:
                     delay = int(cmd.split()[1])
-                    thermostat = self.controller.get_device("thermostat")
-                    if thermostat:
-                        await thermostat.set_cycle_delay(delay)
-                        debug(f"Cycle delay set to {delay} seconds")
-                    else:
-                        debug("Thermostat controller not found!")
+                    await self.controller.update_system_setting('TEMP_SETTINGS', 'CYCLE_DELAY', delay)
                 except (ValueError, IndexError):
                     debug("Invalid delay - use 'delay <seconds>'")
             elif cmd.startswith("heat "):

@@ -45,3 +45,10 @@ class TestCase:
         """Verify that first is greater than second"""
         if not first > second:
             raise AssertionError(msg or f"{first} is not greater than {second}") 
+
+    def assertGreaterEqual(self, first, second, msg=None):
+        """Verify that first is greater than or equal to second"""
+        if not first >= second:
+            self.failed = True
+            self.failure_message = msg or f"{first} is not greater than or equal to {second}"
+            raise AssertionError(self.failure_message) 

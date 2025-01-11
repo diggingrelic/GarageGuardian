@@ -5,6 +5,7 @@ from .controllers.Base import BaseController
 from .logging.Log import info, error, critical, debug
 import time
 import asyncio
+from config import SystemConfig
 
 class SystemState:
     """System state enumeration"""
@@ -192,3 +193,31 @@ class IoTController:
     async def _handle_safety_cleared(self, event):
         """Handle safety condition clearing"""
         info(f"Safety condition cleared: {event['condition']}")
+        
+    async def update_system_setting(self, category, setting, value):
+        """Update system setting and notify all relevant controllers"""
+        config = SystemConfig.get_instance()
+        success, old_value = config.update_setting(category, setting, value)
+        
+        if success:
+            if category == 'TEMP_SETTINGS':
+                thermostat = self.get_device('thermostat')
+                if thermostat:
+                    await thermostat.handle_config_update(setting, value)
+            
+            await self.publish_event("system_setting_changed", {
+                "category": category,
+                "setting": setting,
+                "old_value": old_value,
+                "new_value": value,
+                "timestamp": time.time()
+            })
+            return True
+        return False
+        
+    async def publish_event(self, event_type, data):
+        """Publish an event to all subscribers"""
+        if hasattr(self, 'events') and self.events:
+            await self.events.publish(event_type, data)
+        else:
+            debug(f"Event system not initialized: {event_type} - {data}")

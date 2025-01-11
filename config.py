@@ -33,7 +33,15 @@ class I2CConfig:
 
 class SystemConfig:
     """System-wide settings"""
-    # Thermostat settings
+    _instance = None
+    
+    # Define all class-level defaults that might be accessed before instantiation
+    UPDATE_INTERVALS = {
+        'TEMPERATURE': 5,     # seconds
+        'HEATER_CHECK': 30,   # seconds
+        'SAFETY_CHECK': 5,    # seconds
+    }
+    
     TEMP_SETTINGS = {
         'MIN_TEMP': 40,     # Fahrenheit
         'MAX_TEMP': 90,     # Fahrenheit
@@ -43,21 +51,40 @@ class SystemConfig:
         'TEMP_DIFFERENTIAL': 2.0,  # Changed to 2°F
     }
     
-    # Update intervals
-    UPDATE_INTERVALS = {
-        'TEMPERATURE': 5,     # seconds
-        'HEATER_CHECK': 30,   # seconds
-        'SAFETY_CHECK': 5,    # seconds
-    }
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
     
-    # Safety
-    MAX_RETRIES = 3
-    
-    # Hardware settings
-    HARDWARE = {
-        'I2C_RETRY_COUNT': 3,
-        'I2C_RETRY_DELAY': 0.1,  # seconds
-    }
+    def __init__(self):
+        if SystemConfig._instance is not None:
+            raise RuntimeError("Use get_instance() instead")
+            
+        # Copy class defaults to instance
+        self.TEMP_SETTINGS = SystemConfig.TEMP_SETTINGS.copy()
+        self.UPDATE_INTERVALS = SystemConfig.UPDATE_INTERVALS.copy()
+        
+        # Safety
+        self.MAX_RETRIES = 3
+        
+        # Hardware settings
+        self.HARDWARE = {
+            'I2C_RETRY_COUNT': 3,
+            'I2C_RETRY_DELAY': 0.1,  # seconds
+        }
+        
+        SystemConfig._instance = self
+        
+    def update_setting(self, category, setting, value):
+        """Update a setting and notify all listeners"""
+        if hasattr(self, category):
+            settings = getattr(self, category)
+            if setting in settings:
+                old_value = settings[setting]
+                settings[setting] = value
+                return True, old_value
+        return False, None
 
 class LogConfig:
     """Logging configuration"""

@@ -1,7 +1,7 @@
 from ..interfaces.Relay import RelayDevice
-from ..logging.Log import error, debug
-from machine import Pin
-from config import PinConfig, SystemConfig
+from ..logging.Log import debug
+from machine import Pin # type: ignore
+from config import PinConfig
 import time
 
 class HeaterRelay(RelayDevice):
@@ -30,17 +30,11 @@ class HeaterRelay(RelayDevice):
         
     async def activate(self):
         """Turn heater on"""
-        current_time = time.time()
-        if not await self.is_active():
-            # Check cycle delay
-            if current_time - self._last_change < SystemConfig.TEMP_SETTINGS['CYCLE_DELAY']:
-                raise ValueError("Cannot activate: cycle delay not met")
-                
         debug("Activating heater relay")
         self._pin.on()
         if self._led:
             self._led.on()
-        self._last_change = current_time
+        self._last_change = time.time()
         
     async def deactivate(self):
         """Turn heater off"""

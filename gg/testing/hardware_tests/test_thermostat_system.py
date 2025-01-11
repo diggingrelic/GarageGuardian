@@ -33,12 +33,16 @@ class TestThermostatSystem(TestCase):
             current_temp = self.temp_controller.hardware.get_fahrenheit()
             debug(f"Current temperature: {current_temp}°F")
             
-            # Set test parameters
+            # Set test parameters through IoT controller
             test_delay = 15
-            min_run = 30  # 30 second minimum run time
+            min_run = 30
+            
             debug(f"Setting cycle delay to {test_delay} seconds")
-            await self.thermostat.set_cycle_delay(test_delay)
-            SystemConfig.TEMP_SETTINGS['MIN_RUN_TIME'] = min_run
+            await self.controller.update_system_setting('TEMP_SETTINGS', 'CYCLE_DELAY', test_delay)
+            await self.controller.update_system_setting('TEMP_SETTINGS', 'MIN_RUN_TIME', min_run)
+            
+            # Reset cycle delay timer before starting test
+            await self.thermostat.reset_cycle_delay()
             
             debug("Setting setpoint to 90°F (above room temp)")
             await self.thermostat.set_temperature(90.0)
