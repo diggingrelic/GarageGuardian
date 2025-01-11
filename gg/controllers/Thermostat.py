@@ -34,8 +34,6 @@ class ThermostatController(BaseController):
         
     async def handle_temperature(self, data):
         """Handle temperature update events"""
-        debug("=== Temperature Handler Called ===")
-        debug(f"Received data: {data}")
         try:
             if "temp" not in data:
                 error("Missing temperature data in event")
@@ -46,7 +44,6 @@ class ThermostatController(BaseController):
                 raise ValueError("Invalid temperature reading")
                 
             self._current_temp = float(data["temp"])
-            debug(f"Temperature handler set current_temp to: {self._current_temp}°F")
             await self._check_thermostat()
             
         except Exception as e:
@@ -100,28 +97,31 @@ class ThermostatController(BaseController):
             
             # If heater is on, check if it should turn off
             if await self.hardware.is_active():
-                # Check minimum run time
                 if current_time - self._last_on_time < self._min_run_time:
-                    #debug("Minimum run time not met")
                     return
                     
-                # Turn off if above setpoint + differential
                 if self._current_temp >= setpoint + self._differential:
                     debug(f"*** Temperature {self._current_temp}°F above setpoint {setpoint}°F + differential, turning OFF ***")
                     await self._turn_off()
                     
             # If heater is off, check if it should turn on
             else:
-                # Check cycle delay
-                if current_time - self._last_off_time >= self._cycle_delay:
-                    # Turn on if below setpoint - differential
-                    if self._current_temp <= setpoint - self._differential:
-                        debug(f"*** Temperature {self._current_temp}°F below setpoint {setpoint}°F - differential, turning ON ***")
-                        await self._turn_on()
-                    else:
-                        debug(f"Temperature {self._current_temp}°F too high to turn on (setpoint: {setpoint}°F)")
-                else:
-                    debug(f"Cycle delay not met: {self._cycle_delay - (current_time - self._last_off_time)}s remaining")
+                time_since_off = current_time - self._last_off_time
+                if time_since_off < self._cycle_delay:
+                    remaining = int(self._cycle_delay - time_since_off)
+                    if not hasattr(self, '_cycle_delay_notified'):
+                        debug(f"Status: Temp={self._current_temp}°F, Setpoint={setpoint}°F - Cycle delay in effect")
+                        self._cycle_delay_notified = True
+                    elif remaining % 5 == 0:  # Only log every 5 seconds
+                        debug(f"Cycle delay: {remaining}s remaining")
+                    return
+                    
+                # Reset notification flag when cycle delay is met
+                self._cycle_delay_notified = False
+                
+                if self._current_temp <= setpoint - self._differential:
+                    debug(f"*** Temperature {self._current_temp}°F below setpoint {setpoint}°F - differential, attempting to turn ON ***")
+                    await self._turn_on()
                     
         except Exception as e:
             error(f"Thermostat check failed: {e}")
@@ -156,8 +156,6 @@ class ThermostatController(BaseController):
             return
             
         try:
-            #debug("Thermostat monitor running")  # Debug to show monitor is running
-            # Check thermostat state based on current temperature
             await self._check_thermostat()
         except Exception as e:
             error(f"Thermostat monitoring failed: {e}")
