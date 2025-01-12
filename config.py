@@ -34,21 +34,30 @@ class I2CConfig:
 class SystemConfig:
     """System-wide settings"""
     _instance = None
+    STATE_VERSION = 1
+    
+    # Define all class-level defaults
+    TEMP_SETTINGS = {
+        'MIN_TEMP': 40,     # Fahrenheit
+        'MAX_TEMP': 90,     # Fahrenheit
+        'MIN_RUN_TIME': 300,  # 5 minutes
+        'CYCLE_DELAY': 180,   # 3 minutes
+        'DEFAULT_SETPOINT': 72,  # Default target temperature
+        'TEMP_DIFFERENTIAL': 2.0,  # Changed to 2°F
+        'TARGET_TEMP': 72,    # Current target temperature
+        'HEATER_MODE': 'off'  # Current heater mode (off/heat)
+    }
+    
+    TIMER_SETTINGS = {
+        'END_TIME': None,     # Unix timestamp for timer end
+        'DURATION': None      # Timer duration in hours
+    }
     
     # Define all class-level defaults that might be accessed before instantiation
     UPDATE_INTERVALS = {
         'TEMPERATURE': 5,     # seconds
         'HEATER_CHECK': 30,   # seconds
         'SAFETY_CHECK': 5,    # seconds
-    }
-    
-    TEMP_SETTINGS = {
-        'MIN_TEMP': 40,     # Fahrenheit
-        'MAX_TEMP': 90,     # Fahrenheit
-        'MIN_RUN_TIME': 300,  # 5 minutes
-        'CYCLE_DELAY': 180,   # 3 minutes
-        'DEFAULT_SETPOINT': 72,  # Changed to 72°F
-        'TEMP_DIFFERENTIAL': 2.0,  # Changed to 2°F
     }
     
     @classmethod
