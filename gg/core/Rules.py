@@ -1,16 +1,14 @@
 from micropython import const # type: ignore
-import asyncio
 from ..logging.Log import debug, error
-import time
 
 # Rule system constants
 MAX_RULES = const(20)
 
 # Rule priority levels
-PRIORITY_LOW = 1
-PRIORITY_MEDIUM = 2
-PRIORITY_HIGH = 3
-PRIORITY_CRITICAL = 4
+PRIORITY_LOW = const(1)
+PRIORITY_MEDIUM = const(2)
+PRIORITY_HIGH = const(3)
+PRIORITY_CRITICAL = const(4)
 
 class RulePriority:
     """Rule priority levels
@@ -52,104 +50,61 @@ class RuleCondition:
         self.last_result = False
 
 class Rule:
-    """Represents a system rule with conditions and actions"""
-    
-    def __init__(self, name: str, condition_func, action_func, priority=PRIORITY_MEDIUM):
-        self.name = name
-        self.condition_func = condition_func
-        self.action_func = action_func
-        self.priority = priority
-        self.last_run = 0
+    """Base class for all rules"""
+    def __init__(self):
+        self.name = self.__class__.__name__
         self.enabled = True
+        self.subscriptions = set()
+        
+    def subscribe_to(self, event_type):
+        """Subscribe to an event type"""
+        self.subscriptions.add(event_type)
 
 class RulesEngine:
     """Rules processing engine"""
-    
     def __init__(self, event_system):
         self.rules = {}  # name -> Rule
         self.events = event_system
         self._active = False
         
     async def start(self):
-        """Initialize the rules engine"""
+        """Start the rules engine"""
         self._active = True
+        debug("Rules engine started")
         return True
         
     async def stop(self):
-        """Clean shutdown of rules engine"""
+        """Stop the rules engine"""
         self._active = False
+        debug("Rules engine stopped")
         return True
         
-    def add_rule(self, name: str, condition_func, action_func, priority=PRIORITY_MEDIUM):
-        """Add a new rule
+    async def add_rule(self, rule):
+        """Add a new rule"""
+        self.rules[rule.name] = rule
+        debug(f"Added rule: {rule.name}")
         
-        Args:
-            name: Unique rule identifier
-            condition_func: Function that returns bool when rule should trigger
-            action_func: Async function to execute when rule triggers
-            priority: Rule priority level
-        """
-        rule = Rule(name, condition_func, action_func, priority)
-        self.rules[name] = rule
-        
-    async def evaluate_all(self):
-        """Evaluate and execute all active rules
-        
-        Rules are processed in priority order (highest first)
-        """
+    async def remove_rule(self, name):
+        """Remove a rule"""
+        if name in self.rules:
+            del self.rules[name]
+            debug(f"Removed rule: {name}")
+            
+    async def evaluate_all(self, event=None):
+        """Evaluate all rules"""
         if not self._active:
             return
             
-        # Sort rules by priority
-        sorted_rules = sorted(
-            self.rules.values(),
-            key=lambda r: r.priority,
-            reverse=True
-        )
-        
-        # Evaluate rules
-        for rule in sorted_rules:
-            if not rule.enabled:
-                continue
-                
-            try:
-                if rule.condition_func():
-                    await rule.action_func()
-                    rule.last_run = time.time()
-                    await self.events.publish("rule_triggered", {
-                        "name": rule.name,
-                        "priority": rule.priority
-                    })
-            except Exception as e:
-                await self.events.publish("rule_error", {
-                    "name": rule.name,
-                    "error": str(e)
-                })
-                
-    def disable_rule(self, name: str):
-        """Disable a rule"""
-        if name in self.rules:
-            self.rules[name].enabled = False
-            
-    def enable_rule(self, name: str):
-        """Enable a rule"""
-        if name in self.rules:
-            self.rules[name].enabled = True
-            
-    def get_status(self):
-        """Get rules engine status
-        
-        Returns:
-            dict: Current rules status
-        """
-        return {
-            "active": self._active,
-            "rules": {
-                name: {
-                    "enabled": rule.enabled,
-                    "priority": rule.priority,
-                    "last_run": rule.last_run
-                }
-                for name, rule in self.rules.items()
-            }
-        }
+        for rule in list(self.rules.values()):
+            if rule.enabled:
+                # Check if rule subscribes to this event type
+                if event and hasattr(event, 'type') and \
+                   rule.subscriptions and \
+                   event.type not in rule.subscriptions:
+                    continue
+                    
+                try:
+                    if await rule.evaluate(event):
+                        await self.remove_rule(rule.name)
+                except Exception as e:
+                    error(f"Rule evaluation failed: {e}")

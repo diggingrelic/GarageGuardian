@@ -30,6 +30,10 @@ class ThermostatController(BaseController):
         
         self.events.subscribe("temperature_current", self.handle_temperature)
         
+        # Subscribe to timer events
+        self.events.subscribe("thermostat_timer_start", self._handle_timer_start)
+        self.events.subscribe("thermostat_timer_end", self._handle_timer_end)
+        
     async def initialize(self):
         """Initialize the thermostat hardware"""
         await super().initialize()
@@ -215,3 +219,15 @@ class ThermostatController(BaseController):
         elif setting == 'TEMP_DIFFERENTIAL':
             self._differential = value
             debug(f"Updated temperature differential to {value}°F") 
+        
+    async def _handle_timer_start(self, event):
+        """Handle timer start event"""
+        if event['action'] == "enable":
+            debug(f"Timer start event received - enabling heater")
+            await self.enable_heater()
+            
+    async def _handle_timer_end(self, event):
+        """Handle timer end event"""
+        if event['action'] == "disable":
+            debug(f"Timer end event received - disabling heater")
+            await self.disable_heater() 

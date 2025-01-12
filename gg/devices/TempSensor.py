@@ -3,6 +3,7 @@ from ..logging.Log import error, debug
 from machine import I2C, Pin # type: ignore
 from config import I2CConfig
 import time
+from .bmp390 import BMP390
 
 class TempSensorADT7410(TemperatureDevice):
     """ADT7410 temperature sensor implementation"""
@@ -53,4 +54,52 @@ class TempSensorADT7410(TemperatureDevice):
             return False
         except Exception as e:
             error(f"Temperature sensor initialization failed: {e}")
+            return False 
+
+class TempSensorBMP390(TemperatureDevice):
+    """BMP390 temperature sensor implementation"""
+    
+    def __init__(self, i2c):
+        super().__init__()
+        try:
+            self.sensor = BMP390(i2c)
+            debug("BMP390 sensor initialized")
+        except Exception as e:
+            error(f"Failed to initialize BMP390: {e}")
+            raise
+            
+    def get_fahrenheit(self):
+        """Get temperature in Fahrenheit"""
+        try:
+            celsius = self.sensor.read_temperature()
+            return (celsius * 9/5) + 32
+        except Exception as e:
+            error(f"Failed to read BMP390 temperature: {e}")
+            return None
+            
+    def get_pressure(self):
+        """Get pressure in hPa"""
+        try:
+            pascals = self.sensor.read_pressure()
+            return pascals / 100  # Convert Pa to hPa
+        except Exception as e:
+            error(f"Failed to read BMP390 pressure: {e}")
+            return None
+            
+    def get_altitude(self):
+        """Get altitude in feet"""
+        try:
+            meters = self.sensor.read_altitude()
+            return meters * 3.28084  # Convert meters to feet
+        except Exception as e:
+            error(f"Failed to read BMP390 altitude: {e}")
+            return None
+            
+    async def is_working(self):
+        """Check if sensor is responding"""
+        try:
+            temp = self.get_fahrenheit()
+            return temp is not None
+        except Exception as e:
+            error(f"Failed to check BMP390 status: {e}")
             return False 

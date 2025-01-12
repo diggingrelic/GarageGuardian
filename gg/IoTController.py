@@ -31,8 +31,8 @@ class IoTController:
     def __init__(self, event_system=None, safety_monitor=None):
         self.events = event_system or EventSystem()
         self.safety = safety_monitor or SafetyMonitor()
-        self.rules = RulesEngine(self.events)  # Initialize rules
         self.devices = {}
+        self.rules = RulesEngine(self.events)
         self.state = SystemState.INITIALIZING
         self._monitoring = False  # Initialize monitoring flag here
         
@@ -221,3 +221,36 @@ class IoTController:
             await self.events.publish(event_type, data)
         else:
             debug(f"Event system not initialized: {event_type} - {data}")
+        
+    async def start_timed_heat(self, hours):
+        """Start timed heating operation"""
+        seconds = int(hours * 3600)
+        thermostat = self.get_device('thermostat')
+        
+        if thermostat:
+            # Start heating now
+            await self.events.publish("thermostat_timer_start", {
+                "action": "enable",
+                "timestamp": int(time.time())
+            })
+            
+            # Calculate end time
+            self.timer_end_time = int(time.time() + seconds)
+            
+            # Schedule regular checks
+            asyncio.create_task(self._check_timer())
+            return True
+        return False
+        
+    async def _check_timer(self):
+        """Regularly check if the timer has expired"""
+        while True:
+            await asyncio.sleep(5)  # Check every 5 seconds
+            
+            if time.time() >= self.timer_end_time:
+                # Timer expired
+                await self.events.publish("thermostat_timer_end", {
+                    "action": "disable",
+                    "timestamp": int(time.time())
+                })
+                break
