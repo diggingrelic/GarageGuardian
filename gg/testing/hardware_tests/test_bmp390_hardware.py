@@ -1,5 +1,5 @@
 from ..microtest import TestCase
-from machine import I2C, Pin
+from machine import I2C, Pin # type: ignore
 from ...devices.TempSensor import TempSensorBMP390
 from config import PinConfig, I2CConfig
 from ...logging.Log import debug, error
