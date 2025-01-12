@@ -1,6 +1,5 @@
 import os
 from gg.logging.cowbell_logger import SimpleLogger
-import json
 
 def setup_test_directory():
     """Ensure we have a clean test environment"""
@@ -148,78 +147,3 @@ def run_cowbell_logger_tests():
             print("\nLogger closed properly")
         except Exception as e:
             print(f"Error closing logger: {e}")
-
-class ThermostatStateManager:
-    STATE_VERSION = 1
-    DEFAULT_STATE = {
-        'version': STATE_VERSION,
-        'mode': 'off',          
-        'target_temp': 72,      
-        'schedule_enabled': False,
-        'schedule': {
-            'wake': {'time': '6:00', 'temp': 72},
-            'sleep': {'time': '22:00', 'temp': 65}
-        }
-    }
-    
-    def __init__(self, logger):
-        self.logger = logger
-        self.state_file = '/sd/state/thermostat.json'
-        self.state = self._load_state()
-        
-    def _load_state(self):
-        """Load state from file or return defaults if missing/invalid"""
-        try:
-            with open(self.state_file, 'r') as f:
-                state = json.load(f)
-                
-            # Version check
-            if state.get('version', 0) != self.STATE_VERSION:
-                self.logger.log_entry(f"State version mismatch: {state.get('version')} != {self.STATE_VERSION}")
-                raise ValueError("Version mismatch")
-                
-            return state
-            
-        except (OSError, ValueError, json.JSONDecodeError) as e:
-            self.logger.log_entry(f"Error loading state, using defaults: {str(e)}")
-            if isinstance(e, (ValueError, json.JSONDecodeError)):
-                # Remove corrupted file
-                try:
-                    os.remove(self.state_file)
-                except OSError:
-                    pass
-            return self.DEFAULT_STATE.copy()
-            
-    def save_state(self):
-        """Save current state"""
-        try:
-            # Ensure state directory exists
-            try:
-                os.mkdir('/sd/state')
-            except OSError:
-                pass  # Directory exists
-                
-            # Write state to temp file first
-            temp_file = f"{self.state_file}.tmp"
-            with open(temp_file, 'w') as f:
-                json.dump(self.state, f)
-                
-            # Rename temp file to actual state file
-            os.rename(temp_file, self.state_file)
-            
-            self.logger.log_entry(f"State saved: {self.state['mode']}, {self.state['target_temp']}°F")
-            return True
-            
-        except Exception as e:
-            self.logger.log_entry(f"Error saving state: {str(e)}")
-            return False
-            
-    def update(self, key, value):
-        """Update state and save immediately"""
-        if key in self.DEFAULT_STATE:
-            old_value = self.state.get(key)
-            self.state[key] = value
-            if self.save_state():
-                self.logger.log_entry(f"State updated: {key} changed from {old_value} to {value}")
-                return True
-        return False
