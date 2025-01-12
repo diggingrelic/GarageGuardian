@@ -24,6 +24,11 @@ def setup_test_directory():
             os.remove('/sd/test/state.json')
         except OSError:
             pass  # File doesn't exist, that's fine
+        try:
+            os.stat('/sd/test/timer.json')
+            os.remove('/sd/test/timer.json')
+        except OSError:
+            pass  # File doesn't exist, that's fine
     except Exception as e:
         print(f"Error setting up test directories: {e}")
 
@@ -41,12 +46,12 @@ def test_state_persistence(logger):
         }
     }
     
-    success = logger.save_state(test_state, path="/sd/test")
+    success = logger.save_state(test_state, path="/sd/test", state_file="state.json")
     print(f"Save state successful: {success}")
     assert success, "Failed to save state"
     
     # Test loading state
-    loaded_state = logger.load_state(path="/sd/test")
+    loaded_state = logger.load_state(path="/sd/test", state_file="state.json")
     print(f"Loaded state: {loaded_state}")
     assert loaded_state == test_state, "Loaded state doesn't match saved state"
     
@@ -126,8 +131,9 @@ def run_cowbell_logger_tests():
     print("Starting SimpleLogger tests...")
     
     try:
-        # Initialize logger with test settings
-        logger = SimpleLogger(max_log_files=3)
+        # Get the existing logger instance
+        logger = SimpleLogger.get_instance()
+        
         # Setup clean test environment
         setup_test_directory()
         # Run all tests

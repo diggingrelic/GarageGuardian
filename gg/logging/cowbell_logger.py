@@ -32,7 +32,22 @@ import json
 from gg.devices.pcf8523 import PCF8523
 
 class SimpleLogger:
-    def __init__(self, max_log_files=7, state_file="state.json"):
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls, **kwargs):
+        if cls._instance is None:
+            cls._instance = cls(**kwargs)
+        return cls._instance
+    
+    @classmethod
+    def set_instance(cls, logger):
+        """Allow setting a test logger"""
+        cls._instance = logger
+        
+    def __init__(self, max_log_files=7, state_file="/sd/state.json"):
+        if SimpleLogger._instance is not None:
+            raise RuntimeError("Use get_instance() instead")
         """
         Initialize logger with SD card.
         max_log_files: Number of log files to keep before rotation
@@ -65,20 +80,28 @@ class SimpleLogger:
         except OSError:  # Directory already exists
             pass
     
-    def save_state(self, state_data, path="/sd"):
+    def save_state(self, state_data, path=None, state_file=None):
         """Save persistent state data"""
         try:
-            with open(f'{path}/{self.state_file}', 'w') as f:
+            # Use provided state_file if given, otherwise use default
+            filename = state_file if state_file else self.state_file
+            if path:  # If path provided, construct full path
+                filename = f"{path}/{filename}"
+            with open(filename, 'w') as f:
                 json.dump(state_data, f)
             return True
         except Exception as e:
             print(f"Error saving state: {e}")
             return False
     
-    def load_state(self, path="/sd"):
+    def load_state(self, path=None, state_file=None):
         """Load persistent state data"""
         try:
-            with open(f'{path}/{self.state_file}', 'r') as f:
+            # Use provided state_file if given, otherwise use default
+            filename = state_file if state_file else self.state_file
+            if path:  # If path provided, construct full path
+                filename = f"{path}/{filename}"
+            with open(filename, 'r') as f:
                 return json.load(f)
         except Exception as e:
             print(f"Error loading state: {e}")
@@ -151,3 +174,16 @@ class SimpleLogger:
             os.umount('/sd')
         except Exception as e:
             print(f"Error unmounting SD card: {e}")
+    
+    def delete_state(self, path=None, state_file=None):
+        """Delete a state file"""
+        try:
+            # Use provided state_file if given, otherwise use default
+            filename = state_file if state_file else self.state_file
+            if path:  # If path provided, construct full path
+                filename = f"{path}/{filename}"
+            os.remove(filename)
+            return True
+        except Exception as e:
+            print(f"Error deleting state file: {e}")
+            return False

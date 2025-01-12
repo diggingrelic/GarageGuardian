@@ -7,6 +7,10 @@ from gg.IoTController import IoTController
 from gg.core.DeviceFactory import DeviceFactory
 from gg.core.Events import EventSystem
 from gg.core.Safety import SafetyMonitor
+from gg.logging.cowbell_logger import SimpleLogger
+
+# Initialize core logging first
+logger = SimpleLogger.get_instance()
 
 # Development mode identifier
 debug("=" * 40)
@@ -123,3 +127,5 @@ finally:
     info("System stopped. Use Thonny's Stop/Restart")
     info("to return to development mode.")
     info("="*40 + "\n")
+    # Close logger on shutdown
+    logger.close()

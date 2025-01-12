@@ -6,6 +6,7 @@ from .logging.Log import info, error, critical, debug
 import time
 import asyncio
 from config import SystemConfig
+from gg.logging.cowbell_logger import SimpleLogger
 
 class SystemState:
     """System state enumeration"""
@@ -34,7 +35,8 @@ class IoTController:
         self.devices = {}
         self.rules = RulesEngine(self.events)
         self.state = SystemState.INITIALIZING
-        self._monitoring = False  # Initialize monitoring flag here
+        self._monitoring = False
+        self.logger = SimpleLogger.get_instance()
         
     def register_device(self, name: str, device: BaseController) -> bool:
         """Register a device controller
@@ -79,6 +81,24 @@ class IoTController:
                 self._monitoring = True
                 asyncio.create_task(self._monitor_temperature(temp_controller))
                 
+            # Check for existing timer
+            timer_state = self.logger.load_state(state_file="timer.json")
+            if timer_state:
+                current_time = time.time()
+                timer_end = timer_state.get('timer_end')
+                
+                if timer_end and timer_end > current_time:
+                    # Timer still valid, resume it
+                    self.timer_end_time = timer_end
+                    # Update config
+                    config = SystemConfig.get_instance()
+                    config.update_setting('TIMER_SETTINGS', 'END_TIME', timer_end)
+                    # Start timer check task
+                    asyncio.create_task(self._check_timer())
+                else:
+                    # Timer expired, delete it
+                    self.logger.delete_state(state_file="timer.json")
+            
             self.state = SystemState.RUNNING
             return True
             
@@ -228,14 +248,27 @@ class IoTController:
         thermostat = self.get_device('thermostat')
         
         if thermostat:
+            # Calculate end time
+            self.timer_end_time = int(time.time() + seconds)
+            
+            # Update config for runtime settings
+            config = SystemConfig.get_instance()
+            success, _ = config.update_setting('TIMER_SETTINGS', 'END_TIME', self.timer_end_time)
+            
+            if success:
+                # Save to timer.json for persistence across reboots
+                state = {
+                    'timer_end': self.timer_end_time,
+                    'duration_hours': hours,
+                    'timestamp': time.time()
+                }
+                self.logger.save_state(state, state_file="timer.json")
+            
             # Start heating now
             await self.events.publish("thermostat_timer_start", {
                 "action": "enable",
                 "timestamp": int(time.time())
             })
-            
-            # Calculate end time
-            self.timer_end_time = int(time.time() + seconds)
             
             # Schedule regular checks
             asyncio.create_task(self._check_timer())
