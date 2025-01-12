@@ -1,6 +1,6 @@
 from ..devices.bmp390 import BMP390
 from ..logging.Log import debug, error
-from machine import I2C, Pin
+from machine import I2C, Pin # type: ignore
 
 class Temperature390:
     """Temperature controller for BMP390 sensor
