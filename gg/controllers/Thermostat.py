@@ -65,7 +65,7 @@ class ThermostatController(BaseController):
         await self.publish_event("heater_enabled", {
             "timestamp": time.time(),
             "temp": self._current_temp,
-            "setpoint": self.config.TEMP_SETTINGS['TARGET_TEMP']
+            "setpoint": self.config.TEMP_SETTINGS['SETPOINT']
         })
         
         await self._check_thermostat()
@@ -96,7 +96,7 @@ class ThermostatController(BaseController):
                 await self._state_manager.transition(STATE_DISABLED)
                 return
                 
-            setpoint = float(self.config.TEMP_SETTINGS['TARGET_TEMP'])
+            setpoint = float(self.config.TEMP_SETTINGS['SETPOINT'])
             
             # If heater is on, check if it should turn off
             if await self.hardware.is_active():
@@ -133,7 +133,7 @@ class ThermostatController(BaseController):
         self._last_on_time = time.time()
         await self.publish_event("heater_activated", {
             "temp": self._current_temp,
-            "setpoint": self.config.TEMP_SETTINGS['TARGET_TEMP'],
+            "setpoint": self.config.TEMP_SETTINGS['SETPOINT'],
             "timestamp": self._last_on_time
         })
         
@@ -143,7 +143,7 @@ class ThermostatController(BaseController):
         self._last_off_time = time.time()
         await self.publish_event("heater_deactivated", {
             "temp": self._current_temp,
-            "setpoint": self.config.TEMP_SETTINGS['TARGET_TEMP'],
+            "setpoint": self.config.TEMP_SETTINGS['SETPOINT'],
             "timestamp": self._last_off_time
         })
         
@@ -163,12 +163,8 @@ class ThermostatController(BaseController):
             
     async def set_temperature(self, setpoint):
         """Set the target temperature"""
-        try:
-            if setpoint < self.config.TEMP_SETTINGS['MIN_TEMP'] or \
-               setpoint > self.config.TEMP_SETTINGS['MAX_TEMP']:
-                return False
-                
-            self.config.TEMP_SETTINGS['TARGET_TEMP'] = setpoint
+        try:                
+            self.config.TEMP_SETTINGS['SETPOINT'] = setpoint
             
             await self.publish_event("thermostat_setpoint", {
                 "setpoint": setpoint,
@@ -238,4 +234,4 @@ class ThermostatController(BaseController):
         
     @property
     def setpoint(self):
-        return self.config.TEMP_SETTINGS['TARGET_TEMP'] 
+        return self.config.TEMP_SETTINGS['SETPOINT'] 

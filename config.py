@@ -31,6 +31,13 @@ class I2CConfig:
     FREQUENCY = 400000  # 400kHz
     TIMEOUT = 50000     # 50ms timeout
 
+class LogConfig:
+    """Logging configuration"""
+    DEBUG = True  # Set to False in production
+    LOG_LEVEL = "DEBUG"  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
+    RUN_TESTS = False
+    TEST_DELAY = 2  # Seconds to wait after test failures
+
 class SystemConfig:
     """System-wide settings"""
     _instance = None
@@ -38,13 +45,10 @@ class SystemConfig:
     
     # Define all class-level defaults
     TEMP_SETTINGS = {
-        'MIN_TEMP': 40,     # Fahrenheit
-        'MAX_TEMP': 90,     # Fahrenheit
         'MIN_RUN_TIME': 10,  # 5 minutes
         'CYCLE_DELAY': 10,   # 3 minutes
-        'DEFAULT_SETPOINT': 90,  # Default target temperature
         'TEMP_DIFFERENTIAL': 2.0,  # Changed to 2°F
-        'TARGET_TEMP': 90,    # Current target temperature
+        'SETPOINT': 90,    # Current target temperature
         'HEATER_MODE': 'off'  # Current heater mode (off/heat)
     }
     
@@ -68,11 +72,7 @@ class SystemConfig:
     
     def __init__(self):
         if SystemConfig._instance is not None:
-            raise RuntimeError("Use get_instance() instead")
-            
-        # Copy class defaults to instance
-        self.TEMP_SETTINGS = SystemConfig.TEMP_SETTINGS.copy()
-        self.UPDATE_INTERVALS = SystemConfig.UPDATE_INTERVALS.copy()
+            raise RuntimeError("Use get_instance() instead")        
         
         # Safety
         self.MAX_RETRIES = 3
@@ -84,20 +84,13 @@ class SystemConfig:
         }
         
         SystemConfig._instance = self
-        
-    def update_setting(self, category, setting, value):
-        """Update a setting and notify all listeners"""
-        if hasattr(self, category):
-            settings = getattr(self, category)
-            if setting in settings:
-                old_value = settings[setting]
-                settings[setting] = value
-                return True, old_value
-        return False, None
 
-class LogConfig:
-    """Logging configuration"""
-    DEBUG = True  # Set to False in production
-    LOG_LEVEL = "DEBUG"  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
-    RUN_TESTS = False
-    TEST_DELAY = 2  # Seconds to wait after test failures
+    def update_setting(self, category, setting, value):
+        settings = getattr(SystemConfig, category, None)
+        if settings is None or setting not in settings:
+            return False, None
+            
+        old_value = settings[setting]
+        settings[setting] = value
+        
+        return True, old_value

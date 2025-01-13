@@ -7,6 +7,7 @@ import time
 import asyncio
 from config import SystemConfig
 from gg.logging.cowbell_logger import SimpleLogger
+import os
 
 class SystemState:
     """System state enumeration"""
@@ -82,23 +83,29 @@ class IoTController:
                 asyncio.create_task(self._monitor_temperature(temp_controller))
                 
             # Check for existing timer
-            timer_state = self.logger.load_state(state_file="timer.json")
-            if timer_state:
-                current_time = time.time()
-                timer_end = timer_state.get('timer_end')
-                
-                if timer_end and timer_end > current_time:
-                    # Timer still valid, resume it with exact end time
-                    remaining_mins = (timer_end - current_time) / 60
-                    debug(f"Restoring timer with {remaining_mins:.1f} minutes remaining")
-                    self.timer_end_time = timer_end
-                    config = SystemConfig.get_instance()
-                    config.update_setting('TIMER_SETTINGS', 'END_TIME', timer_end)
-                    asyncio.create_task(self._check_timer())
-                else:
-                    # Timer expired, delete it
-                    debug("Timer expired during shutdown, deleting timer state")
-                    self.logger.delete_state(state_file="timer.json")
+            try:
+                os.stat('/sd/timer.json')
+                # File exists, load it
+                timer_state = self.logger.load_state(state_file="timer.json")
+                if timer_state:
+                    current_time = time.time()
+                    timer_end = timer_state.get('timer_end')
+                    
+                    if timer_end and timer_end > current_time:
+                        # Timer still valid, resume it
+                        remaining_mins = (timer_end - current_time) / 60
+                        debug(f"Restoring timer with {remaining_mins:.1f} minutes remaining")
+                        self.timer_end_time = timer_end
+                        config = SystemConfig.get_instance()
+                        config.update_setting('TIMER_SETTINGS', 'END_TIME', timer_end)
+                        asyncio.create_task(self._check_timer())
+                    else:
+                        # Timer expired, delete it
+                        debug("Timer expired during shutdown, deleting timer state")
+                        self.logger.delete_state(state_file="timer.json")
+            except OSError:
+                # File doesn't exist, that's fine
+                pass
             
             self.state = SystemState.RUNNING
             
