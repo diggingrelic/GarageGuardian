@@ -123,9 +123,12 @@ class DebugInterface:
                 # Display contents of a file
                 try:
                     filename = cmd.split()[1]
+                    # Add /sd/ prefix if not already present
+                    if not filename.startswith('/sd/'):
+                        filename = f'/sd/{filename}'
                     with open(filename, 'r') as f:
                         content = f.read()
-                    debug(f"\nContents of {filename}:")
+                    debug(f"Contents of {filename}:")
                     debug(content)
                 except Exception as e:
                     debug(f"Error reading file: {e}")

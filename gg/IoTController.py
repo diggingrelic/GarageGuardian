@@ -288,7 +288,9 @@ class IoTController:
             await asyncio.sleep(5)  # Check every 5 seconds
             
             if time.time() >= self.timer_end_time:
-                # Timer expired
+                # Timer expired, delete the file
+                self.logger.delete_state(state_file="timer.json")
+                # Send the event
                 await self.events.publish("thermostat_timer_end", {
                     "action": "disable",
                     "timestamp": int(time.time())

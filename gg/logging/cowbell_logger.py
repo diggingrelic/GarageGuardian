@@ -1,30 +1,3 @@
-'''
-# Initialize logger
-logger = SimpleLogger()
-
-# Save thermostat state
-state = {
-    "target_temp": 72,
-    "mode": "heat",
-    "schedule": {"wake": "6:00", "sleep": "22:00"}
-}
-logger.save_state(state)
-
-# Log events
-logger.log_entry("Temperature changed to 73°F")
-logger.log_entry("Heat cycle started")
-
-# Load state after power loss
-saved_state = logger.load_state()
-if saved_state:
-    target_temp = saved_state["target_temp"]
-    mode = saved_state["mode"]
-
-# Always close properly
-logger.close()
-'''
-
-
 import machine # type: ignore
 from machine import Pin, SPI # type: ignore
 import lib.sdcard as sdcard
@@ -97,7 +70,7 @@ class SimpleLogger:
         except OSError:  # Directory already exists
             pass
     
-    def save_state(self, state_data, path=None, state_file=None):
+    def save_state(self, state_data, path="/sd", state_file=None):
         """Save persistent state data"""
         try:
             # Use provided state_file if given, otherwise use default
@@ -110,8 +83,21 @@ class SimpleLogger:
         except Exception as e:
             print(f"Error saving state: {e}")
             return False
-    
-    def load_state(self, path=None, state_file=None):
+        
+    def delete_state(self, path="/sd", state_file=None):
+        """Delete a state file"""
+        try:
+            # Use provided state_file if given, otherwise use default
+            filename = state_file if state_file else self.state_file
+            if path:  # If path provided, construct full path
+                filename = f"{path}/{filename}"
+            os.remove(filename)
+            return True
+        except Exception as e:
+            print(f"Error deleting state file: {e}")
+            return False
+          
+    def load_state(self, path="/sd", state_file=None):
         """Load persistent state data"""
         try:
             # Use provided state_file if given, otherwise use default
@@ -191,16 +177,3 @@ class SimpleLogger:
             os.umount('/sd')
         except Exception as e:
             print(f"Error unmounting SD card: {e}")
-    
-    def delete_state(self, path=None, state_file=None):
-        """Delete a state file"""
-        try:
-            # Use provided state_file if given, otherwise use default
-            filename = state_file if state_file else self.state_file
-            if path:  # If path provided, construct full path
-                filename = f"{path}/{filename}"
-            os.remove(filename)
-            return True
-        except Exception as e:
-            print(f"Error deleting state file: {e}")
-            return False
