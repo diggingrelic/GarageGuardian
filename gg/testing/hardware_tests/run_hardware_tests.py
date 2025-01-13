@@ -6,7 +6,7 @@ from .test_bmp390_hardware import TestBMP390Hardware
 from .cowbell_logger_tests import run_cowbell_logger_tests
 from ...logging.Log import debug, error
 
-async def run_tests(controller):
+async def run_tests(controller, settings_manager):
     """Run hardware integration tests"""
     debug("=== Hardware Integration Tests ===")
     passed = failed = 0
@@ -22,7 +22,7 @@ async def run_tests(controller):
         
         # Test thermostat system
         debug("\n=== Testing Thermostat System ===")
-        therm_test = TestThermostatSystem(controller)
+        therm_test = TestThermostatSystem(controller, settings_manager)
         
         # Test cycle delay
         await therm_test.setUp()

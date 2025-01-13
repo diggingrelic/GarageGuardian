@@ -4,10 +4,11 @@ from ..microtest import TestCase
 from ...logging.Log import debug, error
 
 class TestThermostatSystem(TestCase):
-    def __init__(self, controller):
+    def __init__(self, controller, settings_manager):
         """Initialize the test case"""
         super().__init__()
         self.controller = controller
+        self.settings = settings_manager
         self.thermostat = None
         self.temp_controller = None
         
@@ -37,14 +38,24 @@ class TestThermostatSystem(TestCase):
             min_run = 30
             
             debug(f"Setting cycle delay to {test_delay} seconds")
-            await self.controller.update_system_setting('TEMP_SETTINGS', 'CYCLE_DELAY', test_delay)
-            await self.controller.update_system_setting('TEMP_SETTINGS', 'MIN_RUN_TIME', min_run)
+            await self.controller.events.publish("thermostat_set_cycle_delay", {
+                "delay": test_delay,
+                "timestamp": time.time()
+            })
+
+            await self.controller.events.publish("thermostat_set_min_run_time", {
+                "min_run_time": min_run,
+                "timestamp": time.time()
+            })
             
             # Reset cycle delay timer before starting test
             await self.thermostat.reset_cycle_delay()
             
             debug("Setting setpoint to 90°F (above room temp)")
-            await self.thermostat.set_setpoint(90.0)
+            await self.controller.events.publish("thermostat_set_setpoint", {
+                "setpoint": 90,
+                "timestamp": time.time()
+            })
             
             # Enable and monitor
             debug("Enabling heater and monitoring activation")
@@ -98,7 +109,10 @@ class TestThermostatSystem(TestCase):
             test_duration_hours = 1/120  # 30 seconds in hours
             
             debug(f"Setting cycle delay to {test_delay} seconds")
-            await self.controller.update_system_setting('TEMP_SETTINGS', 'CYCLE_DELAY', test_delay)
+            await self.controller.events.publish("thermostat_set_cycle_delay", {
+                "delay": test_delay,
+                "timestamp": time.time()
+            })
             
             debug(f"Starting {test_duration_hours * 3600} second timed heat")
             result = await self.controller.start_timed_heat(test_duration_hours)

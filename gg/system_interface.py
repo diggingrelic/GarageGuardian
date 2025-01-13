@@ -116,7 +116,7 @@ class SystemInterface:
         """Run hardware tests"""
         try:
             from .testing.hardware_tests.run_hardware_tests import run_tests
-            passed, failed = await run_tests(self.controller)
+            passed, failed = await run_tests(self.controller, self.settings)
             return {"passed": passed, "failed": failed}
         except Exception as e:
             raise Exception(f"Hardware test error: {e}")

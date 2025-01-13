@@ -45,8 +45,8 @@ class SystemConfig:
     STATE_VERSION = 1
     
     TEMP_SETTINGS = {
-        'MIN_RUN_TIME': 10, #minutes
-        'CYCLE_DELAY': 10, #minutes
+        'MIN_RUN_TIME': 30, #seconds
+        'CYCLE_DELAY': 10, #seconds
         'TEMP_DIFFERENTIAL': 2.0, #degrees
         'SETPOINT': 90, #degrees
         'HEATER_MODE': 'off'  # Current heater mode (off/heat)
