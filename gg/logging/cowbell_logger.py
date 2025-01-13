@@ -25,6 +25,7 @@ logger.close()
 '''
 
 
+import machine # type: ignore
 from machine import Pin, SPI # type: ignore
 import lib.sdcard as sdcard
 import os
@@ -56,6 +57,22 @@ class SimpleLogger:
         self.max_log_files = max_log_files
         self.state_file = state_file
         self.rtc = PCF8523()
+        
+        # Sync system time with RTC
+        rtc_datetime = self.rtc.get_datetime()
+        # Convert dict to tuple format that machine.RTC expects
+        datetime_tuple = (
+            rtc_datetime['year'],
+            rtc_datetime['month'],
+            rtc_datetime['day'],
+            rtc_datetime['weekday'],
+            rtc_datetime['hours'],
+            rtc_datetime['minutes'],
+            rtc_datetime['seconds'],
+            0  # subseconds
+        )
+        machine.RTC().datetime(datetime_tuple)
+        
         self._init_sd()
         
     def _init_sd(self):

@@ -57,11 +57,11 @@ class IoTController:
         return True
         
     async def initialize(self, device_factory=None):
-        """Initialize the IoT controller system"""
-        info("Starting IoT controller")
-        self.state = SystemState.INITIALIZING
-        
+        """Initialize controller and devices"""
         try:
+            info("Starting IoT controller")
+            self.state = SystemState.INITIALIZING
+            
             # Initialize core systems
             if not await self.events.start():
                 return False
@@ -88,25 +88,29 @@ class IoTController:
                 timer_end = timer_state.get('timer_end')
                 
                 if timer_end and timer_end > current_time:
-                    # Timer still valid, resume it
+                    # Timer still valid, resume it with exact end time
+                    remaining_mins = (timer_end - current_time) / 60
+                    debug(f"Restoring timer with {remaining_mins:.1f} minutes remaining")
                     self.timer_end_time = timer_end
-                    # Update config
                     config = SystemConfig.get_instance()
                     config.update_setting('TIMER_SETTINGS', 'END_TIME', timer_end)
-                    # Start timer check task
                     asyncio.create_task(self._check_timer())
                 else:
                     # Timer expired, delete it
+                    debug("Timer expired during shutdown, deleting timer state")
                     self.logger.delete_state(state_file="timer.json")
             
             self.state = SystemState.RUNNING
-            return True
             
+            # Initialize time sync tracking
+            self.last_time_sync = time.time()
+            
+            return True
         except Exception as e:
             critical(f"Initialization failed: {e}")
             self.state = SystemState.ERROR
             return False
-            
+        
     async def _monitor_temperature(self, temp_controller):
         """Background task to monitor temperature"""
         while self.state == SystemState.RUNNING:
@@ -142,6 +146,9 @@ class IoTController:
             critical("Safety check failed")
             self.state = SystemState.ERROR
             
+        # Check if time sync needed
+        await self._check_time_sync()
+        
     async def _handle_heartbeat(self, event):
         """Handle system heartbeat events
         
@@ -287,3 +294,20 @@ class IoTController:
                     "timestamp": int(time.time())
                 })
                 break
+        
+    async def _check_time_sync(self):
+        """Check if it's time to sync and send event if needed"""
+        SYNC_INTERVAL = 3600  # 1 hour in seconds
+        current_time = time.time()
+        if current_time - self.last_time_sync >= SYNC_INTERVAL:
+            # Send sync event
+            await self.event_queue.put(("sync_time", None))
+            self.last_time_sync = current_time
+
+    async def handle_sync_time(self, _):
+        """Handle time sync event"""
+        try:
+            self.logger.sync_system_time()
+            debug("System time synced with RTC")
+        except Exception as e:
+            error(f"Time sync error: {e}")

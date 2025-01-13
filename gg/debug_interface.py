@@ -2,6 +2,7 @@ import _thread
 import asyncio
 import time
 from gg.logging.Log import debug, error
+import os
 
 class DebugInterface:
     def __init__(self, controller):
@@ -14,6 +15,14 @@ class DebugInterface:
     async def _show_status(self):
         """Display system status"""
         debug("\nSystem Status:")
+        
+        # Time status
+        rtc = self.controller.logger.rtc  # Get RTC from logger
+        rtc_time = rtc.get_time()  # Get raw RTC time
+        sys_time = time.time()     # Get system time
+        debug(f"RTC time: {rtc_time}")
+        debug(f"System time: {sys_time}")
+        debug(f"Formatted RTC time: {rtc.get_formatted_datetime()}")
         
         # Temperature status
         temp_controller = self.controller.get_device("temperature")
@@ -34,14 +43,31 @@ class DebugInterface:
         else:
             debug("Thermostat controller not found!")
 
+        # Timer status
+        if self.controller.timer_end_time:
+            remaining = self.controller.timer_end_time - time.time()
+            if remaining > 0:
+                debug(f"Timer end: {self.controller.timer_end_time}")
+                debug(f"Current time: {time.time()}")
+                debug(f"Raw remaining seconds: {remaining}")
+                debug(f"Timer active: {remaining/60:.1f} minutes remaining")
+            else:
+                debug("Timer expired")
+        else:
+            debug("No active timer")
+
     async def start(self):
         """Initialize and start the debug interface"""
         debug("\nDebug Interface Ready")
         debug("Commands:")
+        debug("  ls [path] - List files (default: /sd)")
+        debug("  cat <file> - Display file contents")
         debug("  temp - Show current temperature")
         debug("  set <temp> - Set thermostat (e.g. 'set 72')")
         debug("  delay <seconds> - Set cycle delay")
         debug("  heat on/off - Force heater state")
+        debug("  timer start [minutes] - Start timed heat (default 30s)")
+        debug("  timer stop - Stop timed heat")
         debug("  status - Show system status")
         debug("  hwtest - Run hardware integration tests")
         debug("  quit - Exit")
@@ -83,6 +109,48 @@ class DebugInterface:
 
             if cmd == "quit":
                 self.running = False
+            elif cmd.startswith("ls"):
+                # List files in a directory (default to /sd)
+                try:
+                    path = cmd.split()[1] if len(cmd.split()) > 1 else "/sd"
+                    files = os.listdir(path)
+                    debug(f"\nContents of {path}:")
+                    for f in files:
+                        debug(f"  {f}")
+                except Exception as e:
+                    debug(f"Error listing directory: {e}")
+            elif cmd.startswith("cat"):
+                # Display contents of a file
+                try:
+                    filename = cmd.split()[1]
+                    with open(filename, 'r') as f:
+                        content = f.read()
+                    debug(f"\nContents of {filename}:")
+                    debug(content)
+                except Exception as e:
+                    debug(f"Error reading file: {e}")
+            elif cmd.startswith("timer "):
+                try:
+                    action = cmd.split()[1]
+                    if action == "start":
+                        # Get duration in minutes (default to 30 seconds for testing)
+                        try:
+                            minutes = float(cmd.split()[2])
+                        except IndexError:
+                            minutes = 0.5  # 30 seconds
+                        
+                        if await self.controller.start_timed_heat(minutes/60):  # Convert to hours
+                            debug(f"Timer started for {minutes} minutes")
+                        else:
+                            debug("Failed to start timer")
+                    elif action == "stop":
+                        # Add stop timer functionality to controller if needed
+                        await self.controller.stop_timed_heat()
+                        debug("Timer stopped")
+                    else:
+                        debug("Invalid timer command - use 'timer start [minutes]' or 'timer stop'")
+                except Exception as e:
+                    debug(f"Timer command error: {e}")
             elif cmd == "status":
                 await self._show_status()
             elif cmd == "temp":

@@ -40,11 +40,11 @@ class SystemConfig:
     TEMP_SETTINGS = {
         'MIN_TEMP': 40,     # Fahrenheit
         'MAX_TEMP': 90,     # Fahrenheit
-        'MIN_RUN_TIME': 300,  # 5 minutes
-        'CYCLE_DELAY': 180,   # 3 minutes
-        'DEFAULT_SETPOINT': 72,  # Default target temperature
+        'MIN_RUN_TIME': 10,  # 5 minutes
+        'CYCLE_DELAY': 10,   # 3 minutes
+        'DEFAULT_SETPOINT': 90,  # Default target temperature
         'TEMP_DIFFERENTIAL': 2.0,  # Changed to 2°F
-        'TARGET_TEMP': 72,    # Current target temperature
+        'TARGET_TEMP': 90,    # Current target temperature
         'HEATER_MODE': 'off'  # Current heater mode (off/heat)
     }
     
@@ -99,5 +99,5 @@ class LogConfig:
     """Logging configuration"""
     DEBUG = True  # Set to False in production
     LOG_LEVEL = "DEBUG"  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
-    RUN_TESTS = True
+    RUN_TESTS = False
     TEST_DELAY = 2  # Seconds to wait after test failures
