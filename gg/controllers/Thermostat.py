@@ -161,52 +161,10 @@ class ThermostatController(BaseController):
         except Exception as e:
             await self.publish_error(f"Cleanup failed: {e}")
             
-    async def set_temperature(self, setpoint):
-        """Set the target temperature"""
-        try:                
-            self.config.TEMP_SETTINGS['SETPOINT'] = setpoint
-            
-            await self.publish_event("thermostat_setpoint", {
-                "setpoint": setpoint,
-                "timestamp": time.time()
-            })
-            debug(f"Setpoint changed to {setpoint}°F")
-            return True
-            
-        except Exception as e:
-            error(f"Failed to set temperature: {e}")
-            return False
-            
-    async def set_cycle_delay(self, delay):
-        """Set the cycle delay"""
-        try:
-            if delay < 0:
-                return False
-                
-            self.config.TEMP_SETTINGS['CYCLE_DELAY'] = delay
-            debug(f"Cycle delay changed to {delay}s")
-            return True
-            
-        except Exception as e:
-            error(f"Failed to set cycle delay: {e}")
-            return False
-            
     async def reset_cycle_delay(self):
         """Reset cycle delay timing"""
         self._last_off_time = time.time()
         debug("Cycle delay timer reset") 
-        
-    async def handle_config_update(self, setting, value):
-        """Handle configuration updates"""
-        if setting == 'MIN_RUN_TIME':
-            self.config.TEMP_SETTINGS['MIN_RUN_TIME'] = value
-            debug(f"Updated minimum run time to {value}s")
-        elif setting == 'CYCLE_DELAY':
-            self.config.TEMP_SETTINGS['CYCLE_DELAY'] = value
-            debug(f"Updated cycle delay to {value}s")
-        elif setting == 'TEMP_DIFFERENTIAL':
-            self.config.TEMP_SETTINGS['TEMP_DIFFERENTIAL'] = value
-            debug(f"Updated temperature differential to {value}°F") 
         
     async def _handle_timer_start(self, event):
         """Handle timer start event"""

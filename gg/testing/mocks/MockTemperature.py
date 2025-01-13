@@ -22,7 +22,7 @@ class MockTemperature(TemperatureDevice):
         return await super().is_working()
         
     # Test helper methods
-    async def set_temperature(self, temp):
+    async def set_setpoint(self, temp):
         """Set the mock temperature reading"""
         self._temperature = temp
         await self.record_reading()

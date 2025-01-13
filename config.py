@@ -1,4 +1,17 @@
 # config.py
+
+class I2CConfig:
+    """I2C bus configuration"""
+    FREQUENCY = 400000  # 400kHz
+    TIMEOUT = 50000     # 50ms timeout
+
+class LogConfig:
+    """Logging configuration"""
+    DEBUG = True  # Set to False in production
+    LOG_LEVEL = "DEBUG"  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
+    RUN_TESTS = False
+    TEST_DELAY = 2  # Seconds to wait after test failures
+
 class PinConfig:
     """Pin assignments for hardware connections"""
     # I2C Bus
@@ -26,29 +39,16 @@ class PinConfig:
         'SYSTEM': None,   # Future use
     }
 
-class I2CConfig:
-    """I2C bus configuration"""
-    FREQUENCY = 400000  # 400kHz
-    TIMEOUT = 50000     # 50ms timeout
-
-class LogConfig:
-    """Logging configuration"""
-    DEBUG = True  # Set to False in production
-    LOG_LEVEL = "DEBUG"  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
-    RUN_TESTS = False
-    TEST_DELAY = 2  # Seconds to wait after test failures
-
 class SystemConfig:
     """System-wide settings"""
     _instance = None
     STATE_VERSION = 1
     
-    # Define all class-level defaults
     TEMP_SETTINGS = {
-        'MIN_RUN_TIME': 10,  # 5 minutes
-        'CYCLE_DELAY': 10,   # 3 minutes
-        'TEMP_DIFFERENTIAL': 2.0,  # Changed to 2°F
-        'SETPOINT': 90,    # Current target temperature
+        'MIN_RUN_TIME': 10, #minutes
+        'CYCLE_DELAY': 10, #minutes
+        'TEMP_DIFFERENTIAL': 2.0, #degrees
+        'SETPOINT': 90, #degrees
         'HEATER_MODE': 'off'  # Current heater mode (off/heat)
     }
     
@@ -57,7 +57,6 @@ class SystemConfig:
         'DURATION': None      # Timer duration in hours
     }
     
-    # Define all class-level defaults that might be accessed before instantiation
     UPDATE_INTERVALS = {
         'TEMPERATURE': 5,     # seconds
         'HEATER_CHECK': 30,   # seconds
@@ -73,15 +72,6 @@ class SystemConfig:
     def __init__(self):
         if SystemConfig._instance is not None:
             raise RuntimeError("Use get_instance() instead")        
-        
-        # Safety
-        self.MAX_RETRIES = 3
-        
-        # Hardware settings
-        self.HARDWARE = {
-            'I2C_RETRY_COUNT': 3,
-            'I2C_RETRY_DELAY': 0.1,  # seconds
-        }
         
         SystemConfig._instance = self
 

@@ -1,5 +1,5 @@
 from ..microtest import TestCase
-from ...IoTController import IoTController, SystemState
+from ...system_controller import SystemController, SystemState
 from ...core.Events import EventSystem
 from ...controllers.Base import BaseController
 from ...interfaces.Base import BaseDevice
@@ -25,12 +25,12 @@ class MockController(BaseController):
     async def update(self):
         self.monitored = True
 
-class TestIoTController(TestCase):
+class TestSystemController(TestCase):
     def setUp(self):
         self.events = EventSystem()
         self.safety = SafetyMonitor()
         self.device_factory = DeviceFactory()
-        self.controller = IoTController(
+        self.controller = SystemController(
             event_system=self.events,
             safety_monitor=self.safety
         )

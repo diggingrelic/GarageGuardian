@@ -8,7 +8,7 @@ print("PRODUCTION MODE")
 
 # Import our GarageOS system
 try:
-    from gg.IoTController import IoTController
+    from gg.system_controller import SystemController
 except Exception as e:
     print(f"Import error: {e}")
     machine.reset()  # In production, reset on import failure
@@ -19,7 +19,7 @@ class GarageOS:
         self.version = "1.0.0"
         self.watchdog = machine.WDT(timeout=8000)  # 8 second watchdog
         try:
-            self.controller = IoTController()
+            self.controller = SystemController()
         except Exception as e:
             print(f"Controller init error: {e}")
             machine.reset()

@@ -17,27 +17,29 @@ class SystemState:
     ERROR = "error"
     SHUTDOWN = "shutdown"
 
-class IoTController:
+class SystemController:
     """Main controller for IoT system
     
     Manages device controllers, coordinates monitoring,
     and integrates with core systems (Events, Rules, Safety).
     
     Example usage:
-        controller = IoTController()
+        controller = SystemController()
         door = DoorController(RealDoor(sensor_pin=16, lock_pin=17), controller.events)
         controller.register_device("main_door", door)
         await controller.start()
     """
     
-    def __init__(self, event_system=None, safety_monitor=None):
+    def __init__(self, event_system=None, safety_monitor=None, settings_manager=None):
         self.events = event_system or EventSystem()
         self.safety = safety_monitor or SafetyMonitor()
+        self.settings = settings_manager
         self.devices = {}
         self.rules = RulesEngine(self.events)
         self.state = SystemState.INITIALIZING
         self._monitoring = False
         self.logger = SimpleLogger.get_instance()
+        self.timer_end_time = None
         
     def register_device(self, name: str, device: BaseController) -> bool:
         """Register a device controller
@@ -71,6 +73,10 @@ class IoTController:
             if not await self.rules.start():
                 return False
 
+            # Restore settings from SD Card
+            await self.settings.restore_all_settings()
+
+            # Initialize devices
             if device_factory:
                 # Let factory create and register devices
                 if not await device_factory.create_devices(self):
@@ -216,10 +222,6 @@ class IoTController:
         """Handle heater deactivation events"""
         info(f"Heater deactivated at {event['temp']}°F (setpoint: {event['setpoint']}°F)")
         
-    async def _handle_setpoint_change(self, event):
-        """Handle thermostat setpoint changes"""
-        info(f"Thermostat setpoint changed to {event['temp']}°F")
-        
     async def _handle_safety_alert(self, event):
         """Handle safety condition alerts"""
         critical(f"Safety alert: {event['condition']} - {event['message']}")
@@ -227,27 +229,6 @@ class IoTController:
     async def _handle_safety_cleared(self, event):
         """Handle safety condition clearing"""
         info(f"Safety condition cleared: {event['condition']}")
-        
-    async def update_system_setting(self, category, setting, value):
-        """Update system setting and notify all relevant controllers"""
-        config = SystemConfig.get_instance()
-        success, old_value = config.update_setting(category, setting, value)
-        
-        if success:
-            if category == 'TEMP_SETTINGS':
-                thermostat = self.get_device('thermostat')
-                if thermostat:
-                    await thermostat.handle_config_update(setting, value)
-            
-            await self.publish_event("system_setting_changed", {
-                "category": category,
-                "setting": setting,
-                "old_value": old_value,
-                "new_value": value,
-                "timestamp": time.time()
-            })
-            return True
-        return False
         
     async def publish_event(self, event_type, data):
         """Publish an event to all subscribers"""
@@ -306,11 +287,11 @@ class IoTController:
         
     async def _check_time_sync(self):
         """Check if it's time to sync and send event if needed"""
-        SYNC_INTERVAL = 3600  # 1 hour in seconds
+        SYNC_INTERVAL = 300  # 1 hour in seconds
         current_time = time.time()
         if current_time - self.last_time_sync >= SYNC_INTERVAL:
-            # Send sync event
-            await self.event_queue.put(("sync_time", None))
+            # Send sync event using events.publish instead of event_queue
+            await self.events.publish("sync_time", None)
             self.last_time_sync = current_time
 
     async def handle_sync_time(self, _):

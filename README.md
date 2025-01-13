@@ -29,7 +29,7 @@ gg/
 │ ├── microtest.py # Testing framework
 │ ├── mocks.py # Mock objects
 │ └── tests/ # Test files
-├── IoTController.py # Main controller
+├── SystemController.py # Main controller
 └── init.py
 
 ## Installation

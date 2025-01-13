@@ -3,11 +3,13 @@ import asyncio
 from config import LogConfig
 from gg.logging.Log import debug, info, warning, error, critical
 from gg.debug_interface import DebugInterface
-from gg.IoTController import IoTController
+from gg.system_controller import SystemController
 from gg.core.DeviceFactory import DeviceFactory
 from gg.core.Events import EventSystem
 from gg.core.Safety import SafetyMonitor
 from gg.logging.cowbell_logger import SimpleLogger
+from gg.system_interface import SystemInterface
+from gg.settings_manager import SettingsManager
 
 # Initialize core logging first
 logger = SimpleLogger.get_instance()
@@ -35,16 +37,43 @@ class GarageOS:
         self.name = "GarageOS"
         self.version = "1.0.0"
         try:
+            # Create core systems first
+            self.logger = SimpleLogger.get_instance()
+            self.events = EventSystem()
+            self.safety = SafetyMonitor()
+            
+            # Create settings manager (needs events and logger)
+            self.settings = SettingsManager(self.events, self.logger)
+            
+            # Create device factory
+            self.device_factory = DeviceFactory()
+            
+            # Initialize main controller with dependencies
+            self.controller = SystemController(
+                event_system=self.events,
+                safety_monitor=self.safety,
+                settings_manager=self.settings  # Pass settings manager in
+            )
+            
+            # Create system interface last since it needs everything
+            self.interface = SystemInterface(
+                self.events,
+                self.settings,
+                self.controller  # For device access
+            )
+
+            '''
             # Create core systems
             self.events = EventSystem()
             self.safety = SafetyMonitor()
             self.device_factory = DeviceFactory()
             
             # Initialize controller with dependencies
-            self.controller = IoTController(
+            self.controller = SystemController(
                 event_system=self.events,
                 safety_monitor=self.safety
             )
+            '''
         except Exception as e:
             error(f"Controller init error: {e}")
             raise
@@ -99,7 +128,11 @@ async def main():
         if await system.startup():
             info("System ready, starting main loop")
             # Create debug interface with existing system controller
-            interface = DebugInterface(system.controller)
+            interface = DebugInterface(
+                events=system.events,
+                settings_manager=system.settings,
+                controller=system.controller
+            )
             
             # Create tasks for both system and debug interface
             system_task = asyncio.create_task(system.run())

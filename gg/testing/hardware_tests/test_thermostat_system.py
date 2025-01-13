@@ -44,7 +44,7 @@ class TestThermostatSystem(TestCase):
             await self.thermostat.reset_cycle_delay()
             
             debug("Setting setpoint to 90°F (above room temp)")
-            await self.thermostat.set_temperature(90.0)
+            await self.thermostat.set_setpoint(90.0)
             
             # Enable and monitor
             debug("Enabling heater and monitoring activation")

@@ -47,19 +47,19 @@ class TestThermostatController(TestCase):
         await self.controller.initialize()
         
         # Valid setpoint
-        result = await self.controller.set_temperature(72.0)
+        result = await self.controller.set_setpoint(72.0)
         self.assertTrue(result)
         self.assertEqual(self.controller.setpoint, 72.0)
         
         # Invalid setpoint (too high)
-        result = await self.controller.set_temperature(SystemConfig.TEMP_SETTINGS['MAX_TEMP'] + 1)
+        result = await self.controller.set_setpoint(SystemConfig.TEMP_SETTINGS['MAX_TEMP'] + 1)
         self.assertFalse(result)
         self.assertEqual(self.controller.setpoint, 72.0)
         
     async def test_temperature_response(self):
         """Test thermostat response to temperature changes"""
         await self.controller.initialize()
-        await self.controller.set_temperature(72.0)
+        await self.controller.set_setpoint(72.0)
         
         # Simulate cold temperature
         await self.controller.handle_temperature({
@@ -87,7 +87,7 @@ class TestThermostatController(TestCase):
     async def test_cycle_delay(self):
         """Test cycle delay enforcement"""
         await self.controller.initialize()
-        await self.controller.set_temperature(72.0)
+        await self.controller.set_setpoint(72.0)
         
         # Turn on then off
         await self.controller.handle_temperature({"temp": 70.0, "timestamp": time.time()})
@@ -110,7 +110,7 @@ class TestThermostatController(TestCase):
     async def test_heater_enable_disable(self):
         """Test heater enable/disable functionality"""
         await self.controller.initialize()
-        await self.controller.set_temperature(72.0)
+        await self.controller.set_setpoint(72.0)
         
         # Initially disabled
         self.assertFalse(self.controller.heater_enabled)
@@ -141,7 +141,7 @@ class TestThermostatController(TestCase):
     async def test_cycle_delay_after_disable(self):
         """Test cycle delay is enforced after disable/enable"""
         await self.controller.initialize()
-        await self.controller.set_temperature(72.0)
+        await self.controller.set_setpoint(72.0)
         await self.controller.enable_heater()
         
         # Turn on then disable
@@ -164,7 +164,7 @@ class TestThermostatController(TestCase):
     async def test_min_run_time_with_disable(self):
         """Test minimum run time is enforced even when disabling"""
         await self.controller.initialize()
-        await self.controller.set_temperature(72.0)
+        await self.controller.set_setpoint(72.0)
         await self.controller.enable_heater()
         
         # Turn on heater

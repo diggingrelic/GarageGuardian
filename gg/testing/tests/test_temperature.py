@@ -55,7 +55,7 @@ class TestTemperatureController(TestCase):
         self.events.subscribe("temperature_changed", on_change)
         
         # Set initial temperature
-        await self.hardware.set_temperature(70.0)
+        await self.hardware.set_setpoint(70.0)
         await self.controller.monitor()
         
         # Should have one current and one change event
@@ -65,7 +65,7 @@ class TestTemperatureController(TestCase):
         
         # Set temperature within differential (shouldn't trigger change)
         small_change = 70.0 + (SystemConfig.TEMP_SETTINGS['TEMP_DIFFERENTIAL'] * 0.5)
-        await self.hardware.set_temperature(small_change)
+        await self.hardware.set_setpoint(small_change)
         await self.controller.monitor()
         
         # Should have new current but no new change event
@@ -74,7 +74,7 @@ class TestTemperatureController(TestCase):
         
         # Set temperature outside differential
         big_change = 70.0 + (SystemConfig.TEMP_SETTINGS['TEMP_DIFFERENTIAL'] * 2)
-        await self.hardware.set_temperature(big_change)
+        await self.hardware.set_setpoint(big_change)
         await self.controller.monitor()
         
         # Should have both new current and change events
