@@ -113,7 +113,7 @@ class TestThermostatController(TestCase):
         await self.controller.set_setpoint(72.0)
         
         # Initially disabled
-        self.assertFalse(self.controller.heater_enabled)
+        self.assertFalse(self.controller.heater_mode)
         
         # Simulate cold temperature - should not turn on when disabled
         await self.controller.handle_temperature({
@@ -124,7 +124,7 @@ class TestThermostatController(TestCase):
         
         # Enable heater
         await self.controller.enable_heater()
-        self.assertTrue(self.controller.heater_enabled)
+        self.assertTrue(self.controller.heater_mode)
         
         # Now should respond to temperature
         await self.controller.handle_temperature({
@@ -135,7 +135,7 @@ class TestThermostatController(TestCase):
         
         # Disable heater
         await self.controller.disable_heater()
-        self.assertFalse(self.controller.heater_enabled)
+        self.assertFalse(self.controller.heater_mode)
         self.assertFalse(await self.hardware.is_active())
         
     async def test_cycle_delay_after_disable(self):
@@ -174,7 +174,7 @@ class TestThermostatController(TestCase):
         
         # Try to disable before minimum run time
         await self.controller.disable_heater()
-        self.assertFalse(self.controller.heater_enabled)
+        self.assertFalse(self.controller.heater_mode)
         self.assertTrue(await self.hardware.is_active())  # Should stay on until min run time
         
         # Wait for minimum run time

@@ -32,7 +32,7 @@ class DebugInterface:
                 
             if status.get('thermostat') is not None:
                 debug(f"Setpoint: {status['setpoint']}°F")
-                debug(f"Heater enabled: {status['heater_enabled']}")
+                debug(f"Heater enabled: {status['heater_mode']}")
                 debug(f"Heater active: {status['heater_active']}")
                 debug(f"Cycle delay: {status['cycle_delay']}s")
                 debug(f"Min run time: {status['min_run_time']}s")
@@ -57,7 +57,9 @@ class DebugInterface:
         debug("  temp - Show current temperature")
         debug("  set <temp> - Set thermostat (e.g. 'set 72')")
         debug("  delay <seconds> - Set cycle delay")
-        debug("  heat on/off - Force heater state")
+        debug("  min_run_time <seconds> - Set min run time")
+        debug("  temp_differential <degrees> - Set temp differential")
+        debug("  heater_mode on/off - Force heater state")
         debug("  timer start [minutes] - Start timed heat (default 30s)")
         debug("  timer stop - Stop timed heat")
         debug("  status - Show system status")
@@ -101,6 +103,27 @@ class DebugInterface:
 
             if cmd == "quit":
                 self.running = False
+            elif cmd.startswith("min_run_time "):
+                try:
+                    min_run_time = int(cmd.split()[1])
+                    await self.gui_controller.set_min_run_time(min_run_time)
+                    debug(f"Min run time set to {min_run_time}s")
+                except Exception as e:
+                    debug(str(e))
+            elif cmd.startswith("temp_differential "):
+                try:
+                    temp_differential = int(cmd.split()[1])
+                    await self.gui_controller.set_temp_differential(temp_differential)
+                    debug(f"Temp differential set to {temp_differential}°F")
+                except Exception as e:
+                    debug(str(e))
+            elif cmd.startswith("heater_mode "):
+                try:
+                    heater_mode = cmd.split()[1]
+                    await self.gui_controller.set_heater_mode(heater_mode)
+                    debug(f"Heater mode set to {heater_mode}")
+                except Exception as e:
+                    debug(str(e))
             elif cmd.startswith("ls"):
                 try:
                     path = cmd.split()[1] if len(cmd.split()) > 1 else "/sd"

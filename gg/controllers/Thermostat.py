@@ -8,16 +8,23 @@ from .thermostat_states import (
     STATE_DISABLED
 )
 from ..logging.Log import debug, error, info
-from config import SystemConfig
 import time
 import asyncio
+from config import SystemConfig
 
 class ThermostatController(BaseController):
-    """Controls heater based on temperature events"""
+    """Controls heater based on temperature events and settings"""
     
     def __init__(self, name, heater_relay, safety, events):
         super().__init__(name, heater_relay, safety, events)
         self.config = SystemConfig.get_instance()
+        
+        # Initialize settings from config
+        self._setpoint = self.config.TEMP_SETTINGS['SETPOINT']
+        self._cycle_delay = self.config.TEMP_SETTINGS['CYCLE_DELAY']
+        self._min_run_time = self.config.TEMP_SETTINGS['MIN_RUN_TIME']
+        self._temp_differential = self.config.TEMP_SETTINGS['TEMP_DIFFERENTIAL']
+        self._heater_mode = 'off'
         
         # Non-persistent state
         self._last_off_time = time.time()
@@ -26,9 +33,10 @@ class ThermostatController(BaseController):
         self._state_manager = ThermostatStateManager(self)
         
         # Subscribe to events
-        self.events.subscribe("temperature_current", self.handle_temperature)
+        self.events.subscribe("temperature_current", self._handle_temperature)
         self.events.subscribe("thermostat_timer_start", self._handle_timer_start)
         self.events.subscribe("thermostat_timer_end", self._handle_timer_end)
+        self.events.subscribe("temp_setting_changed", self._handle_setting_change)
         
     async def initialize(self):
         """Initialize the thermostat hardware"""
@@ -36,8 +44,31 @@ class ThermostatController(BaseController):
         await self.hardware.deactivate()
         await self._state_manager.transition(STATE_IDLE)
         return True
+
+    async def _handle_setting_change(self, event):
+        """Handle settings changes from SettingsManager"""
+        setting = event['setting']
+        value = event['value']
         
-    async def handle_temperature(self, data):
+        if setting == 'HEATER_MODE':
+            self._heater_mode = value
+            if value == 'off':
+                await self._state_manager.transition(STATE_DISABLED)
+            else:
+                await self._state_manager.transition(STATE_IDLE)
+        elif setting == 'SETPOINT':
+            self._setpoint = float(value)
+        elif setting == 'CYCLE_DELAY':
+            self._cycle_delay = float(value)
+        elif setting == 'MIN_RUN_TIME':
+            self._min_run_time = float(value)
+        elif setting == 'TEMP_DIFFERENTIAL':
+            self._temp_differential = float(value)
+            
+        # Check if we need to update heater state
+        await self._check_thermostat()
+        
+    async def _handle_temperature(self, data):
         """Handle temperature update events"""
         try:
             if "temp" not in data or data["temp"] is None:
@@ -59,49 +90,48 @@ class ThermostatController(BaseController):
             error("No temperature reading available")
             return False
             
-        self.config.TEMP_SETTINGS['HEATER_MODE'] = 'heat'
-        await self._state_manager.transition(STATE_IDLE)
-        
-        await self.publish_event("heater_enabled", {
-            "timestamp": time.time(),
-            "temp": self._current_temp,
-            "setpoint": self.config.TEMP_SETTINGS['SETPOINT']
+        await self.events.publish("temp_setting_changed", {
+            "setting": "HEATER_MODE",
+            "value": "heat",
+            "timestamp": time.time()
         })
-        
-        await self._check_thermostat()
         return True
         
     async def disable_heater(self):
         """Disable heater control"""
-        self.config.TEMP_SETTINGS['HEATER_MODE'] = 'off'
-        await self._state_manager.transition(STATE_DISABLED)
-        await self._check_thermostat()
+        await self.events.publish("temp_setting_changed", {
+            "setting": "HEATER_MODE",
+            "value": "off",
+            "timestamp": time.time()
+        })
         
     async def _check_thermostat(self):
         """Check if heater should be on/off based on current temperature"""
         try:
+            if not all([self._setpoint, self._cycle_delay, self._min_run_time, self._temp_differential]):
+                debug("Not all settings initialized yet")
+                return
+                
             current_time = time.time()
             
             # Check minimum run time before any other checks
             if await self.hardware.is_active():
                 time_since_on = current_time - self._last_on_time
-                if time_since_on < self.config.TEMP_SETTINGS['MIN_RUN_TIME']:
+                if time_since_on < self._min_run_time:
                     await self._state_manager.transition(STATE_MIN_RUN)
                     return
             
             if not self.heater_enabled or self._current_temp is None:
                 if await self.hardware.is_active():
-                    if current_time - self._last_on_time >= self.config.TEMP_SETTINGS['MIN_RUN_TIME']:
+                    if current_time - self._last_on_time >= self._min_run_time:
                         await self._turn_off()
                 await self._state_manager.transition(STATE_DISABLED)
                 return
                 
-            setpoint = float(self.config.TEMP_SETTINGS['SETPOINT'])
-            
             # If heater is on, check if it should turn off
             if await self.hardware.is_active():
-                if self._current_temp >= setpoint + self.config.TEMP_SETTINGS['TEMP_DIFFERENTIAL']:
-                    if current_time - self._last_on_time >= self.config.TEMP_SETTINGS['MIN_RUN_TIME']:
+                if self._current_temp >= self._setpoint + self._temp_differential:
+                    if current_time - self._last_on_time >= self._min_run_time:
                         await self._turn_off()
                         await self._state_manager.transition(STATE_IDLE)
                     
@@ -109,13 +139,13 @@ class ThermostatController(BaseController):
             else:
                 time_since_off = current_time - self._last_off_time
                 
-                if time_since_off < self.config.TEMP_SETTINGS['CYCLE_DELAY']:
+                if time_since_off < self._cycle_delay:
                     await self._state_manager.transition(STATE_CYCLE_DELAY)
                     return
                     
                 # Only attempt to turn on if cycle delay has elapsed
-                if time_since_off >= self.config.TEMP_SETTINGS['CYCLE_DELAY'] and \
-                   self._current_temp <= setpoint - self.config.TEMP_SETTINGS['TEMP_DIFFERENTIAL']:
+                if time_since_off >= self._cycle_delay and \
+                   self._current_temp <= self._setpoint - self._temp_differential:
                     await self._turn_on()
                     await self._state_manager.transition(STATE_HEATING)
                 else:
@@ -133,7 +163,7 @@ class ThermostatController(BaseController):
         self._last_on_time = time.time()
         await self.publish_event("heater_activated", {
             "temp": self._current_temp,
-            "setpoint": self.config.TEMP_SETTINGS['SETPOINT'],
+            "setpoint": self._setpoint,
             "timestamp": self._last_on_time
         })
         
@@ -143,7 +173,7 @@ class ThermostatController(BaseController):
         self._last_off_time = time.time()
         await self.publish_event("heater_deactivated", {
             "temp": self._current_temp,
-            "setpoint": self.config.TEMP_SETTINGS['SETPOINT'],
+            "setpoint": self._setpoint,
             "timestamp": self._last_off_time
         })
         
@@ -180,16 +210,26 @@ class ThermostatController(BaseController):
         
     @property
     def heater_enabled(self):
-        return self.config.TEMP_SETTINGS['HEATER_MODE'] == 'heat'
+        """Is heater control enabled"""
+        return self._heater_mode == 'heat'
         
     @property
-    def _cycle_delay(self):
-        return self.config.TEMP_SETTINGS['CYCLE_DELAY']
-        
-    @property
-    def _min_run_time(self):
-        return self.config.TEMP_SETTINGS['MIN_RUN_TIME']
+    def heater_mode(self):
+        """Current heater mode (heat/off)"""
+        return self._heater_mode
         
     @property
     def setpoint(self):
-        return self.config.TEMP_SETTINGS['SETPOINT'] 
+        return self._setpoint
+    
+    @property
+    def cycle_delay(self):
+        return self._cycle_delay
+    
+    @property
+    def min_run_time(self):
+        return self._min_run_time
+    
+    @property
+    def temp_differential(self):
+        return self._temp_differential

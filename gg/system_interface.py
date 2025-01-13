@@ -31,7 +31,7 @@ class SystemInterface:
         if thermostat:
             status['thermostat'] = True
             status['setpoint'] = thermostat.setpoint
-            status['heater_enabled'] = thermostat.heater_enabled
+            status['heater_mode'] = thermostat.heater_mode
             status['heater_active'] = await thermostat.hardware.is_active()
             status['cycle_delay'] = thermostat._cycle_delay
             status['min_run_time'] = thermostat._min_run_time
@@ -87,18 +87,44 @@ class SystemInterface:
         
     async def set_setpoint(self, temp):
         """Set thermostat temperature"""
-        await self.events.publish("thermostat_set_setpoint", {
-            "setpoint": temp,
+        await self.events.publish("temp_setting_changed", {
+            "setting": "SETPOINT",
+            "value": temp,
             "timestamp": time.time()
         })
         
     async def set_cycle_delay(self, delay):
         """Set cycle delay"""
-        await self.events.publish("thermostat_set_cycle_delay", {
-            "delay": delay,
+        await self.events.publish("temp_setting_changed", {
+            "setting": "CYCLE_DELAY",
+            "value": delay,
             "timestamp": time.time()
         })
-        
+
+    async def set_min_run_time(self, min_run_time):
+        """Set min run time"""
+        await self.events.publish("temp_setting_changed", {
+            "setting": "MIN_RUN_TIME",
+            "value": min_run_time,
+            "timestamp": time.time()
+        })
+
+    async def set_temp_differential(self, temp_differential):
+        """Set temp differential"""
+        await self.events.publish("temp_setting_changed", {
+            "setting": "TEMP_DIFFERENTIAL",
+            "value": temp_differential,
+            "timestamp": time.time()
+        })
+
+    async def set_heater_mode(self, heater_mode):
+        """Set heater mode"""
+        await self.events.publish("temp_setting_changed", {
+            "setting": "HEATER_MODE",
+            "value": heater_mode,
+            "timestamp": time.time()
+        })
+
     async def set_heater(self, enabled):
         """Set heater state"""
         thermostat = self.controller.get_device("thermostat")

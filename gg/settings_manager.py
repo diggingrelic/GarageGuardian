@@ -8,90 +8,217 @@ class SettingsManager:
         self.events = events
         self.logger = logger
         self.config = SystemConfig.get_instance()
-        self.events.subscribe("thermostat_set_setpoint", self._handle_setpoint_change)
-        self.events.subscribe("thermostat_set_cycle_delay", self._handle_cycle_delay_change)
-        
+        # Subscribe to all settings-related events
+        self.events.subscribe("temp_setting_changed", self._handle_temp_setting_change)
+
     async def restore_all_settings(self):
-        """Restore all settings on boot"""
-        await self._restore_thermostat_state()
-        # Add other settings restore methods
-        
-    async def _restore_thermostat_state(self):
-        """Restore thermostat state from persistent storage.
-        
-        Returns:
-            bool: True if state was successfully restored, False otherwise
-        """
+        """Restore all temperature settings from persistent storage"""
+        # Load all settings in sequence
+        await self._restore_setpoint()
+        await self._restore_cycle_delay()
+        await self._restore_min_run_time()
+        await self._restore_temp_differential()
+        await self._restore_heater_mode()
+
+    async def _restore_setpoint(self):
+        """Restore thermostat setpoint"""
         try:
-            thermostat_setpoint = self.logger.load_state(state_file="thermostat_setpoint.json")
-            if not thermostat_setpoint:
-                debug("No saved thermostat state found")
+            state = self.logger.load_state(state_file="thermostat_setpoint.json")
+            if not state:
+                debug("No saved setpoint found")
                 return False
-                
-            # Validate required fields
-            required_fields = {'setpoint', 'timestamp'}
-            if not all(field in thermostat_setpoint for field in required_fields):
-                error("Invalid thermostat state format - missing required fields")
+
+            if 'setpoint' not in state or 'timestamp' not in state:
+                error("Invalid setpoint state format")
                 return False
-                
-            # Validate data types
-            if not isinstance(thermostat_setpoint['setpoint'], (int, float)):
-                error("Invalid setpoint type in saved state")
+
+            setpoint = state['setpoint']
+            if not isinstance(setpoint, (int, float)) or not 50 <= float(setpoint) <= 90:
+                error(f"Invalid setpoint value: {setpoint}")
                 return False
-                
-            if not isinstance(thermostat_setpoint['timestamp'], (int, float)):
-                error("Invalid timestamp type in saved state")
-                return False
-                
-            # Publish validated state
-            await self.events.publish("thermostat_set_setpoint", {
-                "setpoint": thermostat_setpoint['setpoint'],
-                "timestamp": thermostat_setpoint['timestamp']
+
+            await self.events.publish("temp_setting_changed", {
+                "setting": "SETPOINT",
+                "value": setpoint,
+                "timestamp": state['timestamp']
             })
-            
-            debug(f"Restored thermostat setpoint: {thermostat_setpoint['setpoint']}°F")
+            debug(f"Restored thermostat setpoint: {setpoint}°F")
             return True
-            
+
         except Exception as e:
-            error(f"Failed to restore thermostat state: {e}")
+            error(f"Failed to restore setpoint: {e}")
             return False
 
-    async def _handle_setpoint_change(self, event):
-        """Handle thermostat setpoint changes"""
-        # Save to persistent storage
-        self.logger.save_state(event, state_file="thermostat_setpoint.json")
-        
-        # Update config directly
-        config = SystemConfig.get_instance()
-        success, old_value = config.update_setting('TEMP_SETTINGS', 'SETPOINT', event['setpoint'])
-        
-        if success:
-            info(f"Thermostat setpoint changed from {old_value}°F to {event['setpoint']}°F")
-        else:
-            error(f"Failed to update thermostat setpoint to {event['setpoint']}°F")
-
-    async def _handle_cycle_delay_change(self, event):
-        """Handle thermostat cycle delay changes"""
+    async def _restore_cycle_delay(self):
+        """Restore cycle delay"""
         try:
-            delay = event['delay']
-            
-            # Validate
-            if delay < 0:
-                error("Invalid cycle delay value")
+            state = self.logger.load_state(state_file="thermostat_cycle_delay.json")
+            if not state:
+                debug("No saved cycle delay found")
                 return False
-                
-            # Update config and persist
-            success, old_value = self.config.update_setting('TEMP_SETTINGS', 'CYCLE_DELAY', delay)
+
+            if 'cycle_delay' not in state or 'timestamp' not in state:
+                error("Invalid cycle delay state format")
+                return False
+
+            delay = state['cycle_delay']
+            if not isinstance(delay, (int, float)) or delay < 0:
+                error(f"Invalid cycle delay value: {delay}")
+                return False
+
+            await self.events.publish("temp_setting_changed", {
+                "setting": "CYCLE_DELAY",
+                "value": delay,
+                "timestamp": state['timestamp']
+            })
+            debug(f"Restored cycle delay: {delay}s")
+            return True
+
+        except Exception as e:
+            error(f"Failed to restore cycle delay: {e}")
+            return False
+
+    async def _restore_min_run_time(self):
+        """Restore minimum run time"""
+        try:
+            state = self.logger.load_state(state_file="thermostat_min_run_time.json")
+            if not state:
+                debug("No saved minimum run time found")
+                return False
+
+            if 'min_run_time' not in state or 'timestamp' not in state:
+                error("Invalid minimum run time state format")
+                return False
+
+            min_run = state['min_run_time']
+            if not isinstance(min_run, (int, float)) or min_run < 0:
+                error(f"Invalid minimum run time value: {min_run}")
+                return False
+
+            await self.events.publish("temp_setting_changed", {
+                "setting": "MIN_RUN_TIME",
+                "value": min_run,
+                "timestamp": state['timestamp']
+            })
+            debug(f"Restored minimum run time: {min_run}s")
+            return True
+
+        except Exception as e:
+            error(f"Failed to restore minimum run time: {e}")
+            return False
+
+    async def _restore_temp_differential(self):
+        """Restore temperature differential"""
+        try:
+            state = self.logger.load_state(state_file="thermostat_temp_differential.json")
+            if not state:
+                debug("No saved temperature differential found")
+                return False
+
+            if 'temp_differential' not in state or 'timestamp' not in state:
+                error("Invalid temperature differential state format")
+                return False
+
+            differential = state['temp_differential']
+            if not isinstance(differential, (int, float)) or differential <= 0:
+                error(f"Invalid temperature differential value: {differential}")
+                return False
+
+            await self.events.publish("temp_setting_changed", {
+                "setting": "TEMP_DIFFERENTIAL",
+                "value": differential,
+                "timestamp": state['timestamp']
+            })
+            debug(f"Restored temperature differential: {differential}°F")
+            return True
+
+        except Exception as e:
+            error(f"Failed to restore temperature differential: {e}")
+            return False
+
+    async def _restore_heater_mode(self):
+        """Restore heater mode"""
+        try:
+            state = self.logger.load_state(state_file="thermostat_heater_mode.json")
+            if not state:
+                debug("No saved heater mode found")
+                return False
+
+            if 'heater_mode' not in state or 'timestamp' not in state:
+                error("Invalid heater mode state format")
+                return False
+
+            mode = state['heater_mode']
+            if mode not in ['heat', 'off']:
+                error(f"Invalid heater mode value: {mode}")
+                return False
+
+            await self.events.publish("temp_setting_changed", {
+                "setting": "HEATER_MODE",
+                "value": mode,
+                "timestamp": state['timestamp']
+            })
+            debug(f"Restored heater mode: {mode}")
+            return True
+
+        except Exception as e:
+            error(f"Failed to restore heater mode: {e}")
+            return False
+
+    async def _handle_temp_setting_change(self, event):
+        """Handle temperature setting changes"""
+        try:
+            setting = event['setting']
+            value = event['value']
+            
+            # Validate based on setting type
+            if not self._validate_temp_setting(setting, value):
+                error(f"Invalid {setting} value: {value}")
+                return False
+
+            # Update config
+            success, old_value = self.config.update_setting('TEMP_SETTINGS', setting, value)
             if success:
+                # Map setting names to their file storage keys
+                setting_keys = {
+                    'SETPOINT': 'setpoint',
+                    'CYCLE_DELAY': 'cycle_delay',
+                    'MIN_RUN_TIME': 'min_run_time',
+                    'TEMP_DIFFERENTIAL': 'temp_differential',
+                    'HEATER_MODE': 'heater_mode'
+                }
+
+                # Save to persistent storage
+                file_key = setting_keys[setting].lower()
                 self.logger.save_state({
-                    'cycle_delay': delay,
+                    file_key: value,
                     'timestamp': time.time()
-                }, state_file="thermostat_cycle_delay.json")
-                
-                info(f"Cycle delay changed from {old_value}s to {delay}s")
+                }, state_file=f"thermostat_{file_key}.json")
+
+                # Log the change
+                unit = '°F' if setting in ['SETPOINT', 'TEMP_DIFFERENTIAL'] else 's'
+                unit = '' if setting == 'HEATER_MODE' else unit
+                info(f"Temperature setting {setting} changed from {old_value}{unit} to {value}{unit}")
                 return True
+
+            error(f"Failed to update {setting} in config")
             return False
             
         except Exception as e:
-            error(f"Failed to update cycle delay: {e}")
+            error(f"Failed to update temperature setting: {e}")
             return False
+
+    def _validate_temp_setting(self, setting, value):
+        """Validate temperature settings"""
+        if setting == 'SETPOINT':
+            return isinstance(value, (int, float)) and 50 <= float(value) <= 90
+        elif setting == 'CYCLE_DELAY':
+            return isinstance(value, (int, float)) and float(value) >= 0
+        elif setting == 'MIN_RUN_TIME':
+            return isinstance(value, (int, float)) and float(value) >= 0
+        elif setting == 'TEMP_DIFFERENTIAL':
+            return isinstance(value, (int, float)) and float(value) > 0
+        elif setting == 'HEATER_MODE':
+            return value in ['heat', 'off']
+        return False
+
