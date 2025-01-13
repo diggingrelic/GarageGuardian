@@ -59,7 +59,7 @@ class DebugInterface:
         debug("  delay <seconds> - Set cycle delay")
         debug("  min_run_time <seconds> - Set min run time")
         debug("  temp_differential <degrees> - Set temp differential")
-        debug("  heater_mode on/off - Force heater state")
+        debug("  heater_mode heat/off - Turn heater on/off")
         debug("  timer start [minutes] - Start timed heat (default 30s)")
         debug("  timer stop - Stop timed heat")
         debug("  status - Show system status")

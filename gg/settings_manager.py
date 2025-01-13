@@ -211,7 +211,7 @@ class SettingsManager:
     def _validate_temp_setting(self, setting, value):
         """Validate temperature settings"""
         if setting == 'SETPOINT':
-            return isinstance(value, (int, float)) and 50 <= float(value) <= 90
+            return isinstance(value, (int, float)) and 30 <= float(value) <= 90
         elif setting == 'CYCLE_DELAY':
             return isinstance(value, (int, float)) and float(value) >= 0
         elif setting == 'MIN_RUN_TIME':
