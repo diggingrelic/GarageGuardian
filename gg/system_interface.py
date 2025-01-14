@@ -119,10 +119,14 @@ class SystemInterface:
         })
 
     async def set_temp_differential(self, temp_differential):
-        """Set temp differential"""
+        """Set temp differential
+        
+        Args:
+            temp_differential (float): Temperature differential in degrees Fahrenheit
+        """
         await self.events.publish("temp_setting_changed", {
             "setting": "TEMP_DIFFERENTIAL",
-            "value": temp_differential,
+            "value": float(temp_differential),
             "timestamp": time.time()
         })
 

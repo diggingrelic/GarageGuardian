@@ -111,7 +111,26 @@ class DebugInterface:
             if cmd == "help":
                 await self._show_help()
             elif cmd == "quit":
-                self.running = False
+                debug("Performing graceful shutdown...")
+                try:
+                    # Get logger instance and close it
+                    from gg.logging.file_logger import SimpleLogger
+                    logger = SimpleLogger.get_instance()
+                    logger.close()
+                    
+                    # Unmount SD card
+                    import os
+                    try:
+                        os.umount('/sd')
+                        debug("SD card unmounted safely")
+                    except Exception as e:
+                        debug(f"Error unmounting SD card: {e}")
+                        
+                    debug("System shutdown complete - you can safely reset the device")
+                except Exception as e:
+                    error(f"Error during shutdown: {e}")
+                finally:
+                    self.running = False
             elif cmd == "alt":
                 try:
                     alt = await self.gui_controller.get_altitude()
@@ -133,7 +152,7 @@ class DebugInterface:
                     debug(str(e))
             elif cmd.startswith("temp_differential "):
                 try:
-                    temp_differential = int(cmd.split()[1])
+                    temp_differential = float(cmd.split()[1])
                     await self.gui_controller.set_temp_differential(temp_differential)
                     debug(f"Temp differential set to {temp_differential}°F")
                 except Exception as e:

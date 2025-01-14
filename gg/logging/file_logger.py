@@ -31,6 +31,9 @@ class SimpleLogger:
         self.state_file = state_file
         self.rtc = PCF8523()
         
+        # Clean up any orphaned temp files
+        self._cleanup_temp_files()
+        
         # Sync system time with RTC
         rtc_datetime = self.rtc.get_datetime()
         # Convert dict to tuple format that machine.RTC expects
@@ -71,19 +74,49 @@ class SimpleLogger:
             pass
     
     def save_state(self, state_data, path="/sd", state_file=None):
-        """Save persistent state data"""
+        """Save persistent state data using atomic write operations"""
+        temp_filename = None
         try:
             # Use provided state_file if given, otherwise use default
             filename = state_file if state_file else self.state_file
             if path:  # If path provided, construct full path
                 filename = f"{path}/{filename}"
-            with open(filename, 'w') as f:
-                json.dump(state_data, f)
-            return True
+                
+            # Create temporary file
+            temp_filename = f"{filename}.tmp"
+            
+            # Verify we can write to the directory
+            try:
+                with open(temp_filename, 'w') as f:
+                    json.dump(state_data, f)
+                    f.flush()  # Ensure data is written to buffer
+                
+                # Verify the temp file was written correctly
+                with open(temp_filename, 'r') as f:
+                    verify_data = json.load(f)
+                    if verify_data != state_data:
+                        raise ValueError("Data verification failed")
+                
+                # If verification passed, perform atomic rename
+                os.rename(temp_filename, filename)
+                return True
+                
+            except (OSError, ValueError) as e:
+                print(f"Error during file operation: {e}")
+                return False
+                
         except Exception as e:
             print(f"Error saving state: {e}")
             return False
-        
+            
+        finally:
+            # Clean up temp file if it exists
+            if temp_filename:
+                try:
+                    os.remove(temp_filename)
+                except OSError:
+                    pass  # File might already be renamed or removed
+    
     def delete_state(self, path="/sd", state_file=None):
         """Delete a state file"""
         try:
@@ -104,8 +137,26 @@ class SimpleLogger:
             filename = state_file if state_file else self.state_file
             if path:  # If path provided, construct full path
                 filename = f"{path}/{filename}"
-            with open(filename, 'r') as f:
-                return json.load(f)
+                
+            # First verify file exists and has content
+            size = os.stat(filename)[6]
+            if size == 0:
+                print(f"Warning: {filename} is empty")
+                return None
+                
+            # Read file with explicit close
+            f = None
+            try:
+                f = open(filename, 'r')
+                data = json.load(f)
+                return data
+            finally:
+                if f:
+                    f.close()
+                    
+        except OSError as e:
+            print(f"File access error: {e}")
+            return None
         except Exception as e:
             print(f"Error loading state: {e}")
             return None
@@ -174,6 +225,41 @@ class SimpleLogger:
     def close(self):
         """Safely unmount SD card"""
         try:
+            # Flush any pending writes
+            import os
+            os.sync()  # Force sync of filesystem
+            # Unmount
             os.umount('/sd')
+            print("SD card safely unmounted")
         except Exception as e:
             print(f"Error unmounting SD card: {e}")
+        finally:
+            # Reset the singleton instance
+            SimpleLogger._instance = None
+    
+    def _cleanup_temp_files(self):
+        """Clean up any orphaned temporary files"""
+        try:
+            # Clean up temp files in root SD directory
+            for file in os.listdir('/sd'):
+                if file.endswith('.tmp'):
+                    try:
+                        os.remove(f'/sd/{file}')
+                        print(f"Cleaned up temp file: {file}")
+                    except Exception as e:
+                        pass
+                        
+            # Clean up temp files in logs directory
+            try:
+                for file in os.listdir('/sd/logs'):
+                    if file.endswith('.tmp'):
+                        try:
+                            os.remove(f'/sd/logs/{file}')
+                            print(f"Cleaned up temp file in logs: {file}")
+                        except Exception as e:
+                            pass
+            except Exception as e:
+                pass  # logs directory might not exist yet
+                
+        except Exception as e:
+            print(f"Error cleaning temp files: {e}")

@@ -7,7 +7,7 @@ from gg.system_controller import SystemController
 from gg.core.DeviceFactory import DeviceFactory
 from gg.core.Events import EventSystem
 from gg.core.Safety import SafetyMonitor
-from gg.logging.cowbell_logger import SimpleLogger
+from gg.logging.file_logger import SimpleLogger
 from gg.system_interface import SystemInterface
 from gg.settings_manager import SettingsManager
 

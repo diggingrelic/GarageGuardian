@@ -1,5 +1,5 @@
 import os
-from gg.logging.cowbell_logger import SimpleLogger
+from gg.logging.file_logger import SimpleLogger
 
 def setup_test_directory():
     """Ensure we have a clean test environment"""
@@ -147,9 +147,3 @@ def run_cowbell_logger_tests():
     except Exception as e:
         print(f"\nTest failed: {e}")
         raise
-    finally:
-        try:
-            logger.close()
-            print("\nLogger closed properly")
-        except Exception as e:
-            print(f"Error closing logger: {e}")

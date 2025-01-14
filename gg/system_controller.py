@@ -7,7 +7,7 @@ from .logging.Log import info, error, critical, debug
 import time
 import asyncio
 from config import SystemConfig
-from gg.logging.cowbell_logger import SimpleLogger
+from gg.logging.file_logger import SimpleLogger
 import os
 
 class SystemState:

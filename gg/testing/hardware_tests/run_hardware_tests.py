@@ -2,7 +2,7 @@ import sys
 import asyncio
 from .test_thermostat_system import TestThermostatSystem
 from .test_bmp390_hardware import TestBMP390Hardware
-from .cowbell_logger_tests import run_cowbell_logger_tests
+from .file_logger_tests import run_cowbell_logger_tests
 from ...logging.Log import debug, error
 
 async def run_tests(controller, settings_manager):
@@ -37,8 +37,12 @@ async def run_tests(controller, settings_manager):
         
         # Run cowbell logger tests
         debug("\n=== Running Cowbell Logger Tests ===")
-        run_cowbell_logger_tests()
-        passed += 1
+        try:
+            run_cowbell_logger_tests()
+            passed += 1
+        except Exception as e:
+            error(f"Logger test failed: {e}")
+            failed += 1
         
     except Exception as e:
         error(f"Test failed: {e}")
