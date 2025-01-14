@@ -1,8 +1,8 @@
 """
 Test script for BMP390 sensor that prints raw and calibrated values for debugging
 """
-from machine import I2C, Pin
-from bmp390 import BMP390
+from machine import I2C, Pin # type: ignore
+from ...devices.bmp390 import BMP390
 import time
 
 def test_bmp390():

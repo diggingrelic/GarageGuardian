@@ -1,6 +1,6 @@
 from ..microtest import TestCase
-from ...devices.TempSensorADT7410 import TempSensorADT7410
-from ...config import I2CConfig, PinConfig
+from ...devices.adt7410 import TempSensorADT7410
+from config import I2CConfig, PinConfig
 from machine import I2C, Pin # type: ignore
 import time
 

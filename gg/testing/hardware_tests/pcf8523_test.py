@@ -1,7 +1,7 @@
 """
 Test suite for PCF8523 RTC library
 """
-from gg.devices.pcf8523_test import PCF8523, PCF8523Error
+from gg.testing.hardware_tests.pcf8523_test import PCF8523, PCF8523Error
 import time
 
 def run_tests():

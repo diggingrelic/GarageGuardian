@@ -2,9 +2,10 @@ from ..interfaces.Temperature import TemperatureDevice
 from ..interfaces.Environmental import EnvironmentalSensorDevice
 from ..logging.Log import error, debug
 import time
-from .bmp390 import BMP390
-from ..services.Base import BaseService
-class TempSensorADT7410(TemperatureDevice):
+from ..devices.bmp390 import BMP390
+from .Base import BaseService
+
+class TempSensorADT7410(BaseService, TemperatureDevice):
     """ADT7410 temperature sensor implementation"""
     
     def __init__(self, i2c):
@@ -55,14 +56,14 @@ class TempSensorADT7410(TemperatureDevice):
             error(f"Temperature sensor initialization failed: {e}")
             return False 
 
-class BMP390Service(BaseService, EnvironmentalSensorDevice):
+class AdafruitBMP390(BaseService, EnvironmentalSensorDevice):
     def __init__(self, i2c):
         super().__init__(name="environmental")
         try:
             self.sensor = BMP390(i2c)
-            debug("BMP390 sensor initialized")
+            debug("AdafruitBMP390 sensor initialized")
         except Exception as e:
-            error(f"Failed to initialize BMP390: {e}")
+            error(f"Failed to initialize AdafruitBMP390: {e}")
             raise
             
     def get_fahrenheit(self):
@@ -71,7 +72,7 @@ class BMP390Service(BaseService, EnvironmentalSensorDevice):
             celsius = self.sensor.read_temperature()
             return (celsius * 9/5) + 32
         except Exception as e:
-            error(f"Failed to read BMP390 temperature: {e}")
+            error(f"Failed to read AdafruitBMP390 temperature: {e}")
             return None
             
     def get_pressure(self):
@@ -80,7 +81,7 @@ class BMP390Service(BaseService, EnvironmentalSensorDevice):
             pascals = self.sensor.read_pressure()
             return pascals / 100  # Convert Pa to hPa
         except Exception as e:
-            error(f"Failed to read BMP390 pressure: {e}")
+            error(f"Failed to read AdafruitBMP390 pressure: {e}")
             return None
             
     def get_altitude(self):
@@ -89,7 +90,7 @@ class BMP390Service(BaseService, EnvironmentalSensorDevice):
             meters = self.sensor.read_altitude()
             return meters * 3.28084  # Convert meters to feet
         except Exception as e:
-            error(f"Failed to read BMP390 altitude: {e}")
+            error(f"Failed to read AdafruitBMP390 altitude: {e}")
             return None
             
     async def is_working(self):
@@ -98,5 +99,5 @@ class BMP390Service(BaseService, EnvironmentalSensorDevice):
             temp = self.get_fahrenheit()
             return temp is not None
         except Exception as e:
-            error(f"Failed to check BMP390 status: {e}")
+            error(f"Failed to check AdafruitBMP390 status: {e}")
             return False 

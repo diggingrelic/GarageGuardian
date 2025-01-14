@@ -1,5 +1,5 @@
 from machine import I2C, Pin # type: ignore
-from ..devices.TempSensor import BMP390Service
+from ..services.Environmental import AdafruitBMP390
 from ..devices.HeaterRelay import HeaterRelay
 from ..controllers.Thermostat import ThermostatController
 from config import PinConfig, I2CConfig
@@ -18,7 +18,7 @@ class DeviceFactory:
     async def create_devices(self, controller):
         try:
             # Create hardware interfaces
-            bmp390_service = BMP390Service(self.i2c)
+            bmp390_service = AdafruitBMP390(self.i2c)
             heater_relay = HeaterRelay()
             
             # Create and initialize controllers
