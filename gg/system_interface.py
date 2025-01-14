@@ -20,12 +20,7 @@ class SystemInterface:
         status['formatted_time'] = rtc.get_formatted_datetime()
         
         # Temperature status
-        temp_controller = self.controller.get_device("temperature")
-        if temp_controller:
-            status['current_temp'] = temp_controller.hardware.get_fahrenheit()
-        else:
-            status['current_temp'] = None
-            
+        status['current_temp'] = await self.get_temperature()
         # Thermostat status
         thermostat = self.controller.get_device("thermostat")
         if thermostat:
@@ -77,12 +72,26 @@ class SystemInterface:
         """Stop timed heat"""
         await self.controller.stop_timed_heat()
         return True
-        
+    
+    async def get_pressure(self):
+        """Get current pressure"""
+        bmp390 = self.controller.get_service("bmp390")
+        if bmp390:
+            return bmp390.get_pressure()
+        raise Exception("Environmental service not found!")
+
+    async def get_altitude(self):
+        """Get current altitude"""
+        bmp390 = self.controller.get_service("bmp390")
+        if bmp390:
+            return bmp390.get_altitude()
+        raise Exception("Pressure sensor not found!")
+
     async def get_temperature(self):
         """Get current temperature"""
-        temp_controller = self.controller.get_device("temperature")
-        if temp_controller:
-            return temp_controller.hardware.get_fahrenheit()
+        bmp390 = self.controller.get_service("bmp390")
+        if bmp390:
+            return bmp390.get_fahrenheit()
         raise Exception("Temperature controller not found!")
         
     async def set_setpoint(self, temp):

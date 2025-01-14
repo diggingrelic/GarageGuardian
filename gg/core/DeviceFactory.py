@@ -1,7 +1,6 @@
 from machine import I2C, Pin # type: ignore
-from ..devices.TempSensor import TempSensorBMP390
+from ..devices.TempSensor import BMP390Service
 from ..devices.HeaterRelay import HeaterRelay
-from ..controllers.Temperature import TemperatureController
 from ..controllers.Thermostat import ThermostatController
 from config import PinConfig, I2CConfig
 from ..logging.Log import error
@@ -19,20 +18,15 @@ class DeviceFactory:
     async def create_devices(self, controller):
         try:
             # Create hardware interfaces
-            temp_sensor = TempSensorBMP390(self.i2c)
+            bmp390_service = BMP390Service(self.i2c)
             heater_relay = HeaterRelay()
             
             # Create and initialize controllers
-            temp_controller = TemperatureController(
-                "temperature",
-                temp_sensor,
-                controller.safety,
-                controller.events
-            )
-            if not await temp_controller.initialize():
-                error("Failed to initialize temperature controller")
+            if not await bmp390_service.initialize():
+                error("Failed to initialize BMP390 service")
                 return False
-                
+            controller.register_service("bmp390", bmp390_service)
+                    
             thermostat = ThermostatController(
                 "thermostat",
                 heater_relay,
@@ -42,9 +36,7 @@ class DeviceFactory:
             if not await thermostat.initialize():
                 error("Failed to initialize thermostat")
                 return False
-            
-            # Register with controller
-            controller.register_device("temperature", temp_controller)
+
             controller.register_device("thermostat", thermostat)
             
             return True

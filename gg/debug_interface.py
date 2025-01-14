@@ -55,6 +55,8 @@ class DebugInterface:
         debug("  ls [path] - List files (default: /sd)")
         debug("  cat <file> - Display file contents")
         debug("  temp - Show current temperature")
+        debug("  alt - Show current altitude")
+        debug("  pressure - Show current pressure")
         debug("  set <temp> - Set thermostat (e.g. 'set 72')")
         debug("  delay <seconds> - Set cycle delay")
         debug("  min_run_time <seconds> - Set min run time")
@@ -103,6 +105,18 @@ class DebugInterface:
 
             if cmd == "quit":
                 self.running = False
+            elif cmd == "alt":
+                try:
+                    alt = await self.gui_controller.get_altitude()
+                    debug(f"Current altitude: {alt}m")
+                except Exception as e:
+                    debug(str(e))
+            elif cmd == "pressure":
+                try:
+                    pressure = await self.gui_controller.get_pressure()
+                    debug(f"Current pressure: {pressure}hPa")
+                except Exception as e:
+                    debug(str(e))
             elif cmd.startswith("min_run_time "):
                 try:
                     min_run_time = int(cmd.split()[1])

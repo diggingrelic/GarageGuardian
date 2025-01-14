@@ -1,6 +1,5 @@
 import sys
 import asyncio
-from ..microtest import TestCase
 from .test_thermostat_system import TestThermostatSystem
 from .test_bmp390_hardware import TestBMP390Hardware
 from .cowbell_logger_tests import run_cowbell_logger_tests

@@ -10,13 +10,13 @@ class TestThermostatSystem(TestCase):
         self.controller = controller
         self.settings = settings_manager
         self.thermostat = None
-        self.temp_controller = None
+        self.bmp390_service = None
         
     async def setUp(self):
         """Initialize test components"""
         # Get existing controllers from IoT controller
         self.thermostat = self.controller.get_device("thermostat")
-        self.temp_controller = self.controller.get_device("temperature")
+        self.bmp390 = self.controller.get_service("bmp390")
         
     async def tearDown(self):
         """Clean up after test"""
@@ -30,7 +30,7 @@ class TestThermostatSystem(TestCase):
         
         try:
             # Get current temperature
-            current_temp = self.temp_controller.hardware.get_fahrenheit()
+            current_temp = self.bmp390.get_fahrenheit()
             debug(f"Current temperature: {current_temp}°F")
             
             # Set test parameters through IoT controller

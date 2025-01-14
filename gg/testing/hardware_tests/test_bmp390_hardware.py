@@ -1,6 +1,6 @@
 from ..microtest import TestCase
 from machine import I2C, Pin # type: ignore
-from ...devices.TempSensor import TempSensorBMP390
+from ...devices.TempSensor import BMP390Service
 from config import PinConfig, I2CConfig
 from ...logging.Log import debug, error
 
@@ -20,7 +20,7 @@ class TestBMP390Hardware(TestCase):
                           scl=Pin(PinConfig.I2C_SCL), 
                           sda=Pin(PinConfig.I2C_SDA), 
                           freq=I2CConfig.FREQUENCY)
-            self.sensor = TempSensorBMP390(self.i2c)
+            self.sensor = BMP390Service(self.i2c)
         except Exception as e:
             error(f"Setup failed: {e}")
             raise

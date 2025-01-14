@@ -1,10 +1,9 @@
 from ..interfaces.Temperature import TemperatureDevice
+from ..interfaces.Environmental import EnvironmentalSensorDevice
 from ..logging.Log import error, debug
-from machine import I2C, Pin # type: ignore
-from config import I2CConfig
 import time
 from .bmp390 import BMP390
-
+from ..services.Base import BaseService
 class TempSensorADT7410(TemperatureDevice):
     """ADT7410 temperature sensor implementation"""
     
@@ -56,11 +55,9 @@ class TempSensorADT7410(TemperatureDevice):
             error(f"Temperature sensor initialization failed: {e}")
             return False 
 
-class TempSensorBMP390(TemperatureDevice):
-    """BMP390 temperature sensor implementation"""
-    
+class BMP390Service(BaseService, EnvironmentalSensorDevice):
     def __init__(self, i2c):
-        super().__init__()
+        super().__init__(name="environmental")
         try:
             self.sensor = BMP390(i2c)
             debug("BMP390 sensor initialized")

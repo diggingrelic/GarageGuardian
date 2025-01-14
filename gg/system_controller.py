@@ -2,6 +2,7 @@ from .core.Events import EventSystem
 from .core.Rules import RulesEngine
 from .core.Safety import SafetyMonitor
 from .controllers.Base import BaseController
+from .services.Base import BaseService
 from .logging.Log import info, error, critical, debug
 import time
 import asyncio
@@ -35,6 +36,7 @@ class SystemController:
         self.safety = safety_monitor or SafetyMonitor()
         self.settings = settings_manager
         self.devices = {}
+        self.services = {}
         self.rules = RulesEngine(self.events)
         self.state = SystemState.INITIALIZING
         self._monitoring = False
@@ -57,6 +59,24 @@ class SystemController:
             
         self.devices[name] = device
         info(f"Device {name} registered")
+        return True
+
+    def register_service(self, name: str, service: BaseService) -> bool:
+        """Register a service
+        
+        Args:
+            name (str): Unique name for the service
+            service (BaseService): Service instance
+            
+        Returns:
+            bool: True if registration successful
+        """
+        if name in self.services:
+            error(f"Service {name} already registered")
+            return False
+            
+        self.services[name] = service
+        info(f"Service {name} registered")
         return True
         
     async def initialize(self, device_factory=None):
@@ -82,12 +102,15 @@ class SystemController:
                 if not await device_factory.create_devices(self):
                     return False
                     
-            # Start monitoring loop for temperature
-            temp_controller = self.get_device("temperature")
-            if temp_controller:
+            # Start monitoring loop for temperature using BMP390 service
+            bmp390 = self.get_service("bmp390")
+            if bmp390:
                 self._monitoring = True
-                asyncio.create_task(self._monitor_temperature(temp_controller))
-                
+                asyncio.create_task(self._monitor_temperature(bmp390))
+            else:
+                error("BMP390 service not found")
+                return False
+
             # Check for existing timer
             try:
                 os.stat('/sd/timer.json')
@@ -124,10 +147,18 @@ class SystemController:
             self.state = SystemState.ERROR
             return False
         
-    async def _monitor_temperature(self, temp_controller):
+    async def _monitor_temperature(self, bmp390):
         """Background task to monitor temperature"""
+        debug("Starting temperature monitoring loop")
         while self.state == SystemState.RUNNING:
-            await temp_controller.monitor()
+            temp = bmp390.get_fahrenheit()
+            if temp is not None:
+                await self.events.publish("temperature_current", {
+                    "temp": temp,
+                    "timestamp": time.time()
+                })
+            else:
+                error("Failed to read temperature from BMP390")
             await asyncio.sleep_ms(100)  # Small delay between checks
         
     async def run(self):
@@ -197,6 +228,10 @@ class SystemController:
     def get_device(self, name: str) -> BaseController:
         """Get a registered device controller by name"""
         return self.devices.get(name)
+    
+    def get_service(self, name: str):
+        """Get a registered service by name"""
+        return self.services.get(name)
         
     async def _handle_error(self, event):
         """Handle error events from controllers"""
