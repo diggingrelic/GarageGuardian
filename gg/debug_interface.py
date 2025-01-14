@@ -51,23 +51,8 @@ class DebugInterface:
     async def start(self):
         """Initialize and start the debug interface"""
         debug("\nDebug Interface Ready")
-        debug("Commands:")
-        debug("  ls [path] - List files (default: /sd)")
-        debug("  cat <file> - Display file contents")
-        debug("  temp - Show current temperature")
-        debug("  alt - Show current altitude")
-        debug("  pressure - Show current pressure")
-        debug("  set <temp> - Set thermostat (e.g. 'set 72')")
-        debug("  delay <seconds> - Set cycle delay")
-        debug("  min_run_time <seconds> - Set min run time")
-        debug("  temp_differential <degrees> - Set temp differential")
-        debug("  heater_mode heat/off - Turn heater on/off")
-        debug("  timer start [minutes] - Start timed heat (default 30s)")
-        debug("  timer stop - Stop timed heat")
-        debug("  status - Show system status")
-        debug("  hwtest - Run hardware integration tests")
-        debug("  quit - Exit")
-
+        await self._show_help()
+        
         _thread.start_new_thread(self._read_input, ())
 
         while self.running:
@@ -86,6 +71,26 @@ class DebugInterface:
         
         debug("Debug interface stopped")
 
+    async def _show_help(self):
+        """Display available commands"""
+        debug("Commands:")
+        debug("  help - Show this help message")
+        debug("  ls [path] - List files (default: /sd)")
+        debug("  cat <file> - Display file contents")
+        debug("  temp - Show current temperature")
+        debug("  alt - Show current altitude")
+        debug("  pressure - Show current pressure")
+        debug("  set <temp> - Set thermostat (e.g. 'set 72')")
+        debug("  delay <seconds> - Set cycle delay")
+        debug("  min_run_time <seconds> - Set min run time")
+        debug("  temp_differential <degrees> - Set temp differential")
+        debug("  heater_mode heat/off - Turn heater on/off")
+        debug("  timer start [minutes] - Start timed heat (default 30s)")
+        debug("  timer stop - Stop timed heat")
+        debug("  status - Show system status")
+        debug("  hwtest - Run hardware integration tests")
+        debug("  quit - Exit")
+
     def _read_input(self):
         """Read user input in separate thread"""
         while self.running:
@@ -103,7 +108,9 @@ class DebugInterface:
             cmd = cmd.strip().lower()
             debug(f"Processing command: {cmd}")
 
-            if cmd == "quit":
+            if cmd == "help":
+                await self._show_help()
+            elif cmd == "quit":
                 self.running = False
             elif cmd == "alt":
                 try:
